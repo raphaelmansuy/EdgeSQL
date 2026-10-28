@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>EdgeSQL reference - API, errors, and dialect matrix</title>
+<meta name="description" content="EdgeSQL API reference: Query methods, the product IR, the error catalog, and the dialect matrix.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Edge<span>SQL</span></a>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <a href="tutorial.html">Tutorial</a>
+      <a href="examples.html">Examples</a>
+      <a href="reference.html" aria-current="page">Reference</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>Reference</h1>
+  <p class="lede">The public surface, the product IR, the error catalog, and the
+  dialect rules. Public names are <code>Query</code>, <code>Filter</code>,
+  <code>FilterSet</code>, <code>Preview</code>, <code>AuditRecord</code>,
+  <code>SqlCraftError</code>, <code>col</code>, <code>select</code>, and
+  <code>param</code>.</p>
+
+  <div class="anchor-list">
+    <a href="#parse">Parse</a>
+    <a href="#inspect">Inspect</a>
+    <a href="#transforms">Transforms</a>
+    <a href="#preview">Preview</a>
+    <a href="#build">Builders</a>
+    <a href="#ir">Product IR</a>
+    <a href="#errors">Errors</a>
+    <a href="#dialects">Dialects</a>
+    <a href="#http">HTTP</a>
+  </div>
+
+  <h2 id="parse">Parse</h2>
+  <table>
+    <thead><tr><th>Call</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td><code>Query.parse(sql, *, dialect, schema=None, mode="library")</code></td><td>A <code>Query</code>, or a <code>SqlCraftError</code></td></tr>
+      <tr><td><code>query.to_sql(dialect=None, pretty=False)</code></td><td>SQL text. A parsed query keeps its dialect.</td></tr>
+      <tr><td><code>query.to_tree()</code></td><td>The product IR document</td></tr>
+    </tbody>
+  </table>
+  <p>Parse runs the gates in order and stops at the first miss: known dialect,
+  non-empty text, one parse result, exactly one statement, a <code>SELECT</code> or
+  <code>WITH</code> root, the dialect rules, column resolution, then the optional
+  <code>pglast</code> check on Postgres.</p>
+
+  <h2 id="inspect">Inspect</h2>
+  <table>
+    <thead><tr><th>Call</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td><code>query.tables()</code></td><td>Physical tables in scope order. CTE names are excluded.</td></tr>
+      <tr><td><code>query.ctes()</code></td><td>CTE aliases</td></tr>
+      <tr><td><code>query.columns()</code></td><td><code>ColumnRef</code> items: <code>table</code>, <code>name</code>, <code>via</code>, <code>tags</code></td></tr>
+      <tr><td><code>query.filters()</code></td><td>A <code>FilterSet</code>. Each item has <code>scope</code>, <code>clause</code>, <code>op</code>, <code>columns</code>, <code>values</code>, <code>negated</code>, <code>sql</code>, and <code>path</code>.</td></tr>
+      <tr><td><code>query.filters().where(column=, table=, scope=, clause=, op=)</code></td><td>A filtered <code>FilterSet</code></td></tr>
+      <tr><td><code>query.filters().to_dicts()</code></td><td>JSON-ready dictionaries</td></tr>
+      <tr><td><code>query.params()</code></td><td><code>[{"param": name}]</code> in source order</td></tr>
+    </tbody>
+  </table>
+  <p>A filter reports one conjunct. An <code>OR</code> group is one item. The
+  <code>via</code> list records each CTE or derived table on the path to the
+  physical table.</p>
+
+  <h2 id="transforms">Transforms</h2>
+  <p>Each call returns a new <code>Query</code> and leaves the original unchanged.</p>
+  <table>
+    <thead><tr><th>Call</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>cte(name)</code></td><td>Focus later verbs inside <code>cte:name</code></td></tr>
+      <tr><td><code>rename_column(old, new, *, table, keep_output_names=True)</code></td><td>Rename a column. A search transform: zero matches blocks the preview.</td></tr>
+      <tr><td><code>and_where(predicate, *, scope=None)</code></td><td>Add a conjunct</td></tr>
+      <tr><td><code>where(predicate)</code></td><td>Alias for <code>and_where</code></td></tr>
+      <tr><td><code>limit(value)</code></td><td>Set <code>LIMIT</code></td></tr>
+      <tr><td><code>remove_filter(filter)</code></td><td>Remove one top-level conjunct</td></tr>
+      <tr><td><code>replace_filter(filter, predicate)</code></td><td>Replace one top-level conjunct</td></tr>
+      <tr><td><code>with_cte(name, query)</code></td><td>Add a CTE. A duplicate name raises <code>DUPLICATE_CTE</code>.</td></tr>
+      <tr><td><code>rename_cte(old, new)</code></td><td>Rename the definition and every reference</td></tr>
+      <tr><td><code>drop_cte(name)</code></td><td>Remove an unreferenced CTE. A live reference raises <code>CTE_IN_USE</code>.</td></tr>
+      <tr><td><code>set_params(patches)</code></td><td>Lane A value patches</td></tr>
+      <tr><td><code>inline_cte(name)</code>, <code>rewrite(fn)</code></td><td>Raise <code>NOT_IN_V1</code></td></tr>
+      <tr><td><code>migrate(target)</code></td><td>A blocked preview with reason <code>MIGRATE_STUB</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Value patches</h3>
+  <table>
+    <thead><tr><th><code>op</code></th><th><code>params</code></th><th>Node kind</th></tr></thead>
+    <tbody>
+      <tr><td><code>set_comparison</code></td><td><code>value</code></td><td><code>Comparison</code></td></tr>
+      <tr><td><code>set_between</code></td><td><code>low</code>, <code>high</code></td><td><code>Between</code></td></tr>
+      <tr><td><code>set_in_list</code></td><td><code>values</code></td><td><code>InList</code></td></tr>
+      <tr><td><code>set_limit</code></td><td><code>value</code></td><td><code>Limit</code></td></tr>
+    </tbody>
+  </table>
+  <p>A patch that sends <code>left</code>, <code>op</code>, <code>column</code>, or
+  <code>children</code> raises <code>STRUCTURE_PATCH</code>. An unknown node id
+  raises <code>UNKNOWN_NODE</code>.</p>
+
+  <h2 id="preview">Preview</h2>
+  <table>
+    <thead><tr><th>Member</th><th>Content</th></tr></thead>
+    <tbody>
+      <tr><td><code>before_sql</code>, <code>after_sql</code></td><td>Pretty SQL in the parse dialect</td></tr>
+      <tr><td><code>ast_diff</code></td><td>The <code>sqlglot.diff</code> edit script</td></tr>
+      <tr><td><code>semantic_diff</code></td><td><code>tables</code>, <code>filters_added</code>, <code>filters_removed</code>, <code>joins_changed</code>, <code>projection_changed</code>, <code>limit_changed</code></td></tr>
+      <tr><td><code>blocked</code>, <code>blocked_reasons</code></td><td>Blocked reasons: <code>NO_MATCH</code>, <code>REPARSE_FAILED</code>, <code>TABLE_SET_CHANGED</code>, <code>DISALLOWED_STATEMENT</code>, <code>MIGRATE_STUB</code></td></tr>
+      <tr><td><code>collapsed</code></td><td>True when the pretty SQL did not change</td></tr>
+      <tr><td><code>fingerprint</code></td><td>First 16 hex characters of SHA-256 of canonical SQL</td></tr>
+      <tr><td><code>apply(actor=)</code></td><td>A new <code>Query</code>, or <code>BLOCKED</code>. Sets <code>last_audit</code> and <code>query.audit</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="build">Builders</h2>
+  <pre><code>from edgesql import col, param, select
+
+query = (
+    select("sales.orders")
+    .where(col("status").eq("paid"))
+    .where(col("amount").gt(param("floor")))
+    .limit(100)
+)
+print(query.to_sql("postgres"))    # ... amount &gt; %(floor)s LIMIT 100
+print(query.to_sql("databricks"))  # ... amount &gt; :floor LIMIT 100</code></pre>
+  <p><code>col(name)</code> offers <code>eq</code>, <code>ne</code>,
+  <code>gt</code>, <code>gte</code>, <code>lt</code>, and <code>lte</code>.
+  <code>param(name)</code> makes a marker. <code>select(table)</code> starts a
+  <code>SELECT *</code>. A built query has no parse dialect, so both dialects are
+  available.</p>
+
+  <h2 id="ir">Product IR</h2>
+  <p><code>schemaVersion</code> is <code>"0.1"</code>. The document has
+  <code>schemaVersion</code>, <code>dialect</code>, <code>rootId</code>, and a flat
+  <code>nodes</code> map. Every node has <code>kind</code>, <code>children</code>,
+  and <code>editable</code>. An editable node adds
+  <code>editMode: "param_value"</code>.</p>
+  <pre><code>{
+  "schemaVersion": "0.1",
+  "dialect": "postgres",
+  "rootId": "n_select",
+  "nodes": {
+    "n_select": {"kind": "Select", "children": ["n_from", "n_where"], "editable": false},
+    "n_from": {"kind": "From", "table": "sales.orders", "children": [], "editable": false},
+    "n_where": {"kind": "Where", "children": ["n_cmp_cust_eq"], "editable": false},
+    "n_cmp_cust_eq": {
+      "kind": "Comparison",
+      "editable": true,
+      "editMode": "param_value",
+      "children": [],
+      "op": "=",
+      "left": {"column": "cust_id"},
+      "right": {"value": 42}
+    }
+  }
+}</code></pre>
+  <p>A comparison is editable only when its right side is a literal, a boolean, a
+  <code>NULL</code>, a negative number, or a parameter marker. A comparison
+  against a column or a function is read-only.</p>
+
+  <h2 id="errors">Errors</h2>
+  <p><code>SqlCraftError</code> carries <code>phase</code>, <code>code</code>,
+  <code>hint</code>, <code>line</code>, <code>col</code>, and
+  <code>track_id</code> (12 lowercase hex characters). <code>display()</code>
+  returns <code>[phase/code] message</code>, plus <code>Hint: </code> when a hint
+  exists. <code>to_body()</code> returns the HTTP object.</p>
+  <table>
+    <thead><tr><th>Phase</th><th>Codes</th></tr></thead>
+    <tbody>
+      <tr><td>parse</td><td><code>UNKNOWN_DIALECT</code>, <code>EMPTY_SQL</code>, <code>PARSE_FAILED</code>, <code>MULTI_STATEMENT</code>, <code>UNSUPPORTED_STATEMENT</code>, <code>DIALECT_NODE</code>, <code>MIXED_MARKERS</code></td></tr>
+      <tr><td>resolve</td><td><code>AMBIGUOUS_COLUMN</code>, <code>UNKNOWN_SOURCE</code>, <code>UNKNOWN_COLUMN</code></td></tr>
+      <tr><td>transform</td><td><code>UNKNOWN_SCOPE</code>, <code>UNSUPPORTED_REMOVE</code>, <code>UNSUPPORTED_NODE</code>, <code>DUPLICATE_CTE</code>, <code>CTE_IN_USE</code>, <code>RECURSIVE_PROJECTION</code>, <code>STRUCTURE_PATCH</code>, <code>UNKNOWN_NODE</code>, <code>NOT_IN_V1</code></td></tr>
+      <tr><td>apply</td><td><code>BLOCKED</code></td></tr>
+      <tr><td>render</td><td><code>CROSS_DIALECT</code></td></tr>
+      <tr><td>http</td><td><code>STALE_FINGERPRINT</code>, <code>DRAFT_NOT_FOUND</code>, <code>CSRF_REQUIRED</code>, <code>DIALECT_MISMATCH</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="dialects">Dialects</h2>
+  <table>
+    <thead><tr><th>Topic</th><th>Postgres</th><th>Databricks</th></tr></thead>
+    <tbody>
+      <tr><td>Quotes</td><td><code>"name"</code></td><td><code>`name`</code></td></tr>
+      <tr><td>Markers</td><td><code>$1</code>, <code>%(name)s</code></td><td><code>:name</code>, <code>?</code></td></tr>
+      <tr><td>QUALIFY</td><td>refused</td><td>accepted</td></tr>
+      <tr><td>SEMI and ANTI joins</td><td>refused</td><td>accepted</td></tr>
+      <tr><td>DISTINCT ON</td><td>accepted</td><td>refused</td></tr>
+      <tr><td>FETCH</td><td>accepted</td><td>refused</td></tr>
+      <tr><td>MAX RECURSION LEVEL</td><td>refused</td><td>kept</td></tr>
+      <tr><td>Recursive CTE</td><td>UNION or UNION ALL</td><td>UNION ALL only</td></tr>
+      <tr><td>Mixed markers</td><td>not applicable</td><td><code>MIXED_MARKERS</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="http">HTTP</h2>
+  <table>
+    <thead><tr><th>Route</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /</code></td><td>The HTML screen, with a session cookie and a CSRF token</td></tr>
+      <tr><td><code>GET /healthz</code></td><td><code>{"ok": true}</code></td></tr>
+      <tr><td><code>GET /v1/examples</code></td><td>The example gallery</td></tr>
+      <tr><td><code>POST /v1/queries</code></td><td>201 with <code>draft_id</code>, <code>dialect</code>, and <code>fingerprint</code></td></tr>
+      <tr><td><code>GET /v1/queries/{id}/tree</code></td><td>The product IR</td></tr>
+      <tr><td><code>PATCH /v1/queries/{id}/params</code></td><td>A patch, guarded by <code>If-Match</code></td></tr>
+      <tr><td><code>POST /v1/queries/{id}/preview</code></td><td>Before, after, diff, reasons, <code>preview_fingerprint</code>, and <code>filter_values</code></td></tr>
+      <tr><td><code>POST /v1/queries/{id}/apply</code></td><td>A new draft and the audit record</td></tr>
+      <tr><td><code>POST /v1/queries/{id}/to_sql</code></td><td>SQL in the draft dialect</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>Situation</th><th>Status</th><th>Code</th></tr></thead>
+    <tbody>
+      <tr><td>Created</td><td>201</td><td>none</td></tr>
+      <tr><td>Read, preview, or SQL</td><td>200</td><td>none</td></tr>
+      <tr><td>Bad SQL or bad patch</td><td>422</td><td>catalog code</td></tr>
+      <tr><td>Stale fingerprint</td><td>409</td><td><code>STALE_FINGERPRINT</code></td></tr>
+      <tr><td>Unknown draft</td><td>404</td><td><code>DRAFT_NOT_FOUND</code></td></tr>
+      <tr><td>Missing CSRF</td><td>403</td><td><code>CSRF_REQUIRED</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="credits">Credits and license</h2>
+  <p>Copyright 2026 Raphael Mansuy. Licensed under the Apache License, Version 2.0.
+  SQLGlot supplies the parser and the printer and keeps its own MIT license. The
+  Postgres regression fixtures keep the PostgreSQL license, and the Databricks
+  examples come from the Databricks documentation. See the
+  <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/NOTICE">notice</a>
+  for the full list.</p>
+
+  <section class="author" id="author" aria-labelledby="author-name">
+  <img src="assets/raphael-mansuy.jpg" alt="Headshot of Raphael Mansuy, author of EdgeSQL." width="128" height="128" loading="lazy">
+  <div>
+    <h3 id="author-name">Raphael Mansuy</h3>
+    <p class="meta">Author of EdgeSQL</p>
+    <p>Raphael builds data platforms and developer tools. He works on SQL engines,
+    data pipelines, and the small libraries that make those systems easier to
+    operate. He writes about SQL, data engineering, and practical software design.</p>
+    <p>EdgeSQL started from one observation: changing SQL with string replacement
+    breaks as soon as two edits touch the same name. A typed tree with a preview
+    gate is the smallest honest fix, so he built it and tested it against the
+    official Postgres and Databricks statements.</p>
+    <p class="links">
+      <a class="btn" href="https://www.linkedin.com/in/raphaelmansuy/">Connect on LinkedIn</a>
+      <a class="btn" href="https://github.com/raphaelmansuy/EdgeSQL">Repository</a>
+    </p>
+  </div>
+</section>
+  <section class="cta-band" aria-label="Follow the work">
+  <p><strong>Building something with SQL?</strong> Tell Raphael about it.</p>
+  <a class="btn primary" href="https://www.linkedin.com/in/raphaelmansuy/">Connect on LinkedIn</a>
+</section>
+  <footer class="site-footer">
+  <div class="row">
+    <span>Copyright 2026 Raphael Mansuy. Licensed under the Apache License, Version 2.0.</span>
+    <nav>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/LICENSE">License</a>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/NOTICE">Notice</a>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL">GitHub</a>
+      <a href="https://www.linkedin.com/in/raphaelmansuy/">LinkedIn</a>
+    </nav>
+  </div>
+  <div class="row">
+    <span>SQLGlot supplies the parser and the printer and keeps its own MIT license.</span>
+    <span>EdgeSQL 0.1.0</span>
+  </div>
+</footer>
+</main>
+</body>
+</html>

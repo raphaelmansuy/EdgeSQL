@@ -1,0 +1,233 @@
+[
+  {
+    "id": "pg-simple",
+    "dialect": "postgres",
+    "title": "Simple filter",
+    "tags": ["where"],
+    "sql": "SELECT cust_id, status, amount\nFROM sales.orders\nWHERE status = 'paid'"
+  },
+  {
+    "id": "pg-join",
+    "dialect": "postgres",
+    "title": "Inner join with two predicates",
+    "tags": ["join"],
+    "sql": "SELECT c.region, SUM(o.amount) AS total\nFROM sales.orders o\nJOIN sales.customers c ON c.id = o.cust_id AND c.active = TRUE\nWHERE o.status = 'paid'\nGROUP BY c.region"
+  },
+  {
+    "id": "pg-two-predicates",
+    "dialect": "postgres",
+    "title": "Three filter kinds in one WHERE",
+    "tags": ["where", "in", "between"],
+    "sql": "SELECT id, cust_id, amount, region\nFROM sales.orders\nWHERE status = 'paid'\n  AND amount BETWEEN 100 AND 500\n  AND region IN ('EU', 'US')"
+  },
+  {
+    "id": "pg-left-join-anti",
+    "dialect": "postgres",
+    "title": "Left join used as an anti join",
+    "tags": ["join", "null"],
+    "sql": "SELECT c.id, c.email\nFROM sales.customers c\nLEFT JOIN sales.orders o ON o.cust_id = c.id\nWHERE o.id IS NULL"
+  },
+  {
+    "id": "pg-three-way",
+    "dialect": "postgres",
+    "title": "Three way join",
+    "tags": ["join"],
+    "sql": "SELECT o.id, c.email, p.method, p.amount\nFROM sales.orders o\nJOIN sales.customers c ON c.id = o.cust_id\nJOIN sales.payments p ON p.order_id = o.id AND p.amount > 0\nWHERE c.region IN ('EU', 'US')"
+  },
+  {
+    "id": "pg-self-join",
+    "dialect": "postgres",
+    "title": "Self join for the previous order",
+    "tags": ["join", "window"],
+    "sql": "SELECT curr.id, prev.id AS previous_id\nFROM sales.orders curr\nLEFT JOIN sales.orders prev\n  ON prev.cust_id = curr.cust_id AND prev.created_at < curr.created_at\nWHERE curr.status = 'open'"
+  },
+  {
+    "id": "pg-exists",
+    "dialect": "postgres",
+    "title": "Correlated EXISTS",
+    "tags": ["subquery", "exists"],
+    "sql": "SELECT c.id, c.email\nFROM sales.customers c\nWHERE EXISTS (\n  SELECT 1 FROM sales.orders o\n  WHERE o.cust_id = c.id AND o.status = 'paid'\n)"
+  },
+  {
+    "id": "pg-not-exists",
+    "dialect": "postgres",
+    "title": "Correlated NOT EXISTS",
+    "tags": ["subquery", "exists"],
+    "sql": "SELECT c.id\nFROM sales.customers c\nWHERE NOT EXISTS (\n  SELECT 1 FROM sales.orders o\n  WHERE o.cust_id = c.id AND o.amount > 500\n)"
+  },
+  {
+    "id": "pg-scalar",
+    "dialect": "postgres",
+    "title": "Scalar subquery in the projection",
+    "tags": ["subquery", "aggregate"],
+    "sql": "SELECT o.id, o.amount,\n  (SELECT MAX(p.amount) FROM sales.payments p WHERE p.order_id = o.id) AS largest_payment\nFROM sales.orders o\nWHERE o.amount > 50"
+  },
+  {
+    "id": "pg-in-subquery",
+    "dialect": "postgres",
+    "title": "IN against a subquery",
+    "tags": ["subquery", "in"],
+    "sql": "SELECT c.id\nFROM sales.customers c\nWHERE c.region IN (\n  SELECT r.code FROM sales.regions r WHERE r.active\n)"
+  },
+  {
+    "id": "pg-derived",
+    "dialect": "postgres",
+    "title": "Derived table with a filter",
+    "tags": ["subquery"],
+    "sql": "SELECT t.cust_id, t.total\nFROM (\n  SELECT o.cust_id, SUM(o.amount) AS total\n  FROM sales.orders o\n  GROUP BY o.cust_id\n) t\nWHERE t.total > 1000"
+  },
+  {
+    "id": "pg-cte",
+    "dialect": "postgres",
+    "title": "CTE feeding a join",
+    "tags": ["cte", "join"],
+    "sql": "WITH paid AS (\n  SELECT o.cust_id, SUM(o.amount) AS total\n  FROM sales.orders o\n  WHERE o.status = 'paid'\n  GROUP BY o.cust_id\n)\nSELECT c.region, COUNT(*) AS customers\nFROM paid p\nJOIN sales.customers c ON c.id = p.cust_id\nGROUP BY c.region"
+  },
+  {
+    "id": "pg-two-ctes",
+    "dialect": "postgres",
+    "title": "Two CTEs, one joined to the other",
+    "tags": ["cte", "join"],
+    "sql": "WITH paid AS (\n  SELECT cust_id, SUM(amount) AS total FROM sales.orders\n  WHERE status = 'paid' GROUP BY cust_id\n),\nbig AS (\n  SELECT cust_id FROM paid WHERE total > 1000\n)\nSELECT c.id, c.email\nFROM sales.customers c\nJOIN big b ON b.cust_id = c.id\nWHERE c.active"
+  },
+  {
+    "id": "pg-recursive",
+    "dialect": "postgres",
+    "title": "Recursive CTE over an org tree",
+    "tags": ["cte", "recursive"],
+    "sql": "WITH RECURSIVE tree AS (\n  SELECT id, manager_id, 1 AS depth\n  FROM hr.employees\n  WHERE manager_id IS NULL\n  UNION ALL\n  SELECT e.id, e.manager_id, t.depth + 1\n  FROM hr.employees e\n  JOIN tree t ON e.manager_id = t.id\n)\nSELECT id, depth FROM tree WHERE depth < 5"
+  },
+  {
+    "id": "pg-window",
+    "dialect": "postgres",
+    "title": "Window function with QUALIFY-free ranking",
+    "tags": ["window", "subquery"],
+    "sql": "SELECT id, cust_id, amount\nFROM (\n  SELECT id, cust_id, amount,\n    ROW_NUMBER() OVER (PARTITION BY cust_id ORDER BY amount DESC) AS rn\n  FROM sales.orders\n) ranked\nWHERE rn = 1"
+  },
+  {
+    "id": "pg-union",
+    "dialect": "postgres",
+    "title": "UNION of two branches",
+    "tags": ["set"],
+    "sql": "SELECT cust_id FROM sales.orders WHERE status = 'paid'\nUNION\nSELECT cust_id FROM sales.refunds WHERE settled"
+  },
+  {
+    "id": "pg-between-like",
+    "dialect": "postgres",
+    "title": "BETWEEN, LIKE, and a parameter",
+    "tags": ["where", "param"],
+    "sql": "SELECT id, amount\nFROM sales.orders\nWHERE amount BETWEEN 10 AND 500\n  AND email LIKE '%@example.com'\n  AND status = $1"
+  },
+  {
+    "id": "pg-distinct-on",
+    "dialect": "postgres",
+    "title": "DISTINCT ON keeps the first row",
+    "tags": ["postgres"],
+    "sql": "SELECT DISTINCT ON (cust_id) cust_id, id, created_at\nFROM sales.orders\nORDER BY cust_id, created_at DESC"
+  },
+  {
+    "id": "pg-lateral",
+    "dialect": "postgres",
+    "title": "LATERAL join to a top-three subquery",
+    "tags": ["join", "subquery"],
+    "sql": "SELECT c.id, top.id AS order_id, top.amount\nFROM sales.customers c\nJOIN LATERAL (\n  SELECT o.id, o.amount FROM sales.orders o\n  WHERE o.cust_id = c.id\n  ORDER BY o.amount DESC\n  LIMIT 3\n) top ON TRUE\nWHERE c.region = 'EU'"
+  },
+  {
+    "id": "dbx-simple",
+    "dialect": "databricks",
+    "title": "Simple filter",
+    "tags": ["where"],
+    "sql": "SELECT cust_id, status, amount\nFROM sales.orders\nWHERE status = 'paid'"
+  },
+  {
+    "id": "dbx-qualify",
+    "dialect": "databricks",
+    "title": "QUALIFY on a window function",
+    "tags": ["qualify", "window"],
+    "sql": "SELECT city, car_model, quantity\nFROM dealer\nQUALIFY RANK() OVER (PARTITION BY car_model ORDER BY quantity) = 1"
+  },
+  {
+    "id": "dbx-qualify-alias",
+    "dialect": "databricks",
+    "title": "QUALIFY references an output alias",
+    "tags": ["qualify"],
+    "sql": "SELECT city, car_model,\n  RANK() OVER (PARTITION BY car_model ORDER BY quantity) AS rank\nFROM dealer\nQUALIFY rank = 1"
+  },
+  {
+    "id": "dbx-semi",
+    "dialect": "databricks",
+    "title": "SEMI join",
+    "tags": ["join", "databricks"],
+    "sql": "SELECT o.id, o.amount\nFROM sales.orders o\nLEFT SEMI JOIN sales.customers c ON c.id = o.cust_id\nWHERE o.status = 'paid'"
+  },
+  {
+    "id": "dbx-anti",
+    "dialect": "databricks",
+    "title": "ANTI join",
+    "tags": ["join", "databricks"],
+    "sql": "SELECT c.id\nFROM sales.customers c\nLEFT ANTI JOIN sales.orders o ON o.cust_id = c.id"
+  },
+  {
+    "id": "dbx-cte",
+    "dialect": "databricks",
+    "title": "CTE with a QUALIFY step",
+    "tags": ["cte", "qualify"],
+    "sql": "WITH recent AS (\n  SELECT cust_id, id, amount, created_at\n  FROM sales.orders\n  WHERE created_at >= '2026-01-01'\n)\nSELECT cust_id, id, amount\nFROM recent\nQUALIFY ROW_NUMBER() OVER (PARTITION BY cust_id ORDER BY created_at DESC) = 1"
+  },
+  {
+    "id": "dbx-recursive",
+    "dialect": "databricks",
+    "title": "Recursive CTE with MAX RECURSION",
+    "tags": ["cte", "recursive"],
+    "sql": "WITH RECURSIVE t(n) AS (\n  SELECT 1\n  UNION ALL\n  SELECT n + 1 FROM t WHERE n < 5\n)\nMAX RECURSION LEVEL 10\nSELECT * FROM t"
+  },
+  {
+    "id": "dbx-param",
+    "dialect": "databricks",
+    "title": "Named parameter marker",
+    "tags": ["param"],
+    "sql": "SELECT trip_distance, fare_amount\nFROM samples.nyctaxi.trips\nWHERE fare_amount < :fare_parameter"
+  },
+  {
+    "id": "dbx-unqualified-params",
+    "dialect": "databricks",
+    "title": "Three positional markers",
+    "tags": ["param"],
+    "sql": "SELECT current_timestamp() + ?, ? * ? AS square"
+  },
+  {
+    "id": "dbx-join-subquery",
+    "dialect": "databricks",
+    "title": "Join to a grouped subquery",
+    "tags": ["join", "subquery"],
+    "sql": "SELECT c.id, t.total\nFROM sales.customers c\nJOIN (\n  SELECT cust_id, SUM(amount) AS total\n  FROM sales.orders\n  GROUP BY cust_id\n) t ON t.cust_id = c.id\nWHERE t.total > 100"
+  },
+  {
+    "id": "dbx-exists",
+    "dialect": "databricks",
+    "title": "Correlated EXISTS",
+    "tags": ["subquery", "exists"],
+    "sql": "SELECT c.id\nFROM sales.customers c\nWHERE EXISTS (\n  SELECT 1 FROM sales.orders o WHERE o.cust_id = c.id\n)"
+  },
+  {
+    "id": "dbx-nested-cte",
+    "dialect": "databricks",
+    "title": "Three CTE layers",
+    "tags": ["cte"],
+    "sql": "WITH base AS (\n  SELECT cust_id, amount, status FROM sales.orders\n),\npaid AS (\n  SELECT cust_id, SUM(amount) AS total FROM base WHERE status = 'paid' GROUP BY cust_id\n),\ntop AS (\n  SELECT cust_id, total FROM paid WHERE total > 500\n)\nSELECT c.id, top.total\nFROM sales.customers c\nJOIN top ON top.cust_id = c.id"
+  },
+  {
+    "id": "dbx-limit",
+    "dialect": "databricks",
+    "title": "Limit the newest rows",
+    "tags": ["limit"],
+    "sql": "SELECT id, created_at\nFROM sales.orders\nWHERE status = 'open'\nORDER BY created_at DESC\nLIMIT 25"
+  },
+  {
+    "id": "dbx-between-limit",
+    "dialect": "databricks",
+    "title": "Range and row limit",
+    "tags": ["where", "between", "limit"],
+    "sql": "SELECT id, amount\nFROM sales.orders\nWHERE amount BETWEEN 10 AND 250\n  AND status = 'paid'\nLIMIT 10"
+  }
+]

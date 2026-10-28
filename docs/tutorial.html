@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>EdgeSQL tutorial - from install to a committed change</title>
+<meta name="description" content="A step by step tutorial for EdgeSQL: parse, inspect, rename with preview, patch a value, apply, and handle an error.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Edge<span>SQL</span></a>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <a href="tutorial.html" aria-current="page">Tutorial</a>
+      <a href="examples.html">Examples</a>
+      <a href="reference.html">Reference</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>Tutorial</h1>
+  <p class="lede">Six steps. Each step shows the code and the screen that the code
+  changes. The total time is about 15 minutes.</p>
+
+  <div class="anchor-list">
+    <a href="#install">1 Install</a>
+    <a href="#parse">2 Parse</a>
+    <a href="#inspect">3 Inspect</a>
+    <a href="#rename">4 Rename with preview</a>
+    <a href="#patch">5 Patch a value</a>
+    <a href="#screen">6 Drive the screen</a>
+    <a href="#errors">7 Handle an error</a>
+  </div>
+
+  <div class="note">
+    <p>You need Python 3.11 or later. The library uses SQLGlot 30.25.0. No
+    database connection is necessary. The library reads and writes SQL text.</p>
+  </div>
+
+  <section class="step" id="install">
+    <div class="step-number">1</div>
+    <div class="step-body">
+      <h3>Install</h3>
+      <p>Clone the repository and make a virtual environment.</p>
+      <pre><code>git clone https://github.com/raphaelmansuy/EdgeSQL.git
+cd EdgeSQL
+python3 -m venv .venv
+.venv/bin/pip install -e .
+
+.venv/bin/python -c "import edgesql; print('ready')"</code></pre>
+      <p>The install adds one dependency, <code>sqlglot==30.25.0</code>. The
+      optional extra <code>postgres</code> adds <code>pglast</code> for a second
+      Postgres check.</p>
+    </div>
+  </section>
+
+  <section class="step" id="parse">
+    <div class="step-number">2</div>
+    <div class="step-body">
+      <h3>Parse a statement</h3>
+      <p>Name the dialect. The dialect is never guessed.</p>
+      <pre><code>from edgesql import Query
+
+sql = """
+SELECT cust_id, status, amount
+FROM sales.orders
+WHERE cust_id = 42 AND status = 'paid'
+"""
+
+query = Query.parse(sql, dialect="postgres")
+print(query.to_sql())</code></pre>
+      <p>Parse runs seven gates in order: known dialect, non-empty text, one
+      statement, a <code>SELECT</code> or <code>WITH</code> root, the dialect
+      rules, and column resolution. The first miss raises. You get a
+      <code>Query</code> back only when all gates pass.</p>
+      <figure>
+        <img src="assets/screenshots/02-ready-desktop.png" alt="The screen in the ready state: query tree on the left, filter panel on the right, before SQL below.">
+        <figcaption>The same statement in the report helper. The tree shows the
+        resolved structure. The filter panel shows one control per editable
+        node.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="step" id="inspect">
+    <div class="step-number">3</div>
+    <div class="step-body">
+      <h3>Inspect before you edit</h3>
+      <p>Read the tables, the CTEs, the filters, and the parameters.</p>
+      <pre><code>print(query.tables())      # ['sales.orders']
+print(query.ctes())        # []
+
+for item in query.filters():
+    print(item.scope, item.clause, item.op, item.values)
+# root where = (42,)
+# root where = ('paid',)
+
+for column in query.columns():
+    print(column.table, column.name, column.via)
+# sales.orders cust_id ()
+# sales.orders status ()</code></pre>
+      <p>A filter reports the physical table it reads and the hop list that reaches
+      it. With a CTE in the path, the hop list is not empty. That is how you know a
+      column passes through a CTE.</p>
+    </div>
+  </section>
+
+  <section class="step" id="rename">
+    <div class="step-number">4</div>
+    <div class="step-body">
+      <h3>Rename a column with preview</h3>
+      <p>A rename is a search transform. It records how many columns it matched.
+      A rename with zero matches does not raise. It makes the preview blocked.</p>
+      <pre><code>preview = query.preview(
+    lambda item: item.rename_column("cust_id", "customer_id", table="sales.orders")
+)
+
+print(preview.blocked)          # False
+print(preview.collapsed)        # False
+print(preview.fingerprint)      # 16 hex characters
+
+applied = preview.apply(actor="builder")
+print(applied.to_sql())
+# SELECT customer_id AS cust_id, status, amount
+# FROM sales.orders
+# WHERE customer_id = 42 AND status = 'paid'</code></pre>
+      <p>The output name stays <code>cust_id</code> because
+      <code>keep_output_names</code> defaults to true. The original
+      <code>query</code> is unchanged.</p>
+      <figure>
+        <img src="assets/screenshots/05-green-desktop.png" alt="A green preview: the before SQL and the after SQL side by side, with Apply enabled.">
+        <figcaption>A clean preview. The status word is <code>Ready to apply</code>
+        and Apply is enabled.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="step" id="patch">
+    <div class="step-number">5</div>
+    <div class="step-body">
+      <h3>Patch a value</h3>
+      <p>A value patch is Lane A. It needs a node id from the product IR and it
+      replaces the right-hand value only.</p>
+      <pre><code>tree = query.to_tree()
+print(tree["rootId"])                        # n_select
+print(tree["nodes"]["n_cmp_cust_eq"]["right"])  # {'value': 42}
+
+patched = query.set_params([
+    {"op": "set_comparison", "nodeId": "n_cmp_cust_eq", "params": {"value": 99}},
+])
+print(query.preview(lambda _item: patched).apply(actor="reader").to_sql())
+# ... WHERE cust_id = 99 AND status = 'paid'</code></pre>
+      <p>The same lane covers ranges, lists, and limits.</p>
+      <pre><code>from edgesql import Query
+
+query = Query.parse(
+    "SELECT id FROM sales.orders WHERE amount BETWEEN 10 AND 20 AND region IN ('EU', 'US') LIMIT 5",
+    dialect="postgres",
+)
+nodes = query.to_tree()["nodes"]
+ids = {node["kind"]: key for key, node in nodes.items() if node["editable"]}
+
+query = query.set_params([{"op": "set_between", "nodeId": ids["Between"], "params": {"low": 30, "high": 90}}])
+query = query.set_params([{"op": "set_in_list", "nodeId": ids["InList"], "params": {"values": ["APAC", "LATAM"]}}])
+query = query.set_params([{"op": "set_limit", "nodeId": ids["Limit"], "params": {"value": 42}}])
+print(query.to_sql())</code></pre>
+      <p>A patch that sends <code>left</code>, <code>op</code>, <code>column</code>,
+      or <code>children</code> raises <code>STRUCTURE_PATCH</code>. A patch on a
+      read-only node raises the same code.</p>
+    </div>
+  </section>
+
+  <section class="step" id="screen">
+    <div class="step-number">6</div>
+    <div class="step-body">
+      <h3>Drive the screen</h3>
+      <p>The example app builds its controls from the IR. Start it and open the
+      page.</p>
+      <pre><code>make dev
+# Report helper: http://127.0.0.1:8765</code></pre>
+      <p>Choose <strong>Paste SQL or pick an example</strong>, then pick an example.
+      The filter panel fills itself. Change a value, then press Enter or use
+      Preview. Apply stays disabled until a clean preview exists.</p>
+      <div class="grid-2">
+        <figure>
+          <img src="assets/screenshots/04-dirty-desktop.png" alt="An edited value: the status word is Unsaved value and Apply is disabled.">
+          <figcaption>Edited. Preview is stale, so Apply is off.</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/screenshots/07-applied.png" alt="The applied state: the committed SQL is in the before panel.">
+          <figcaption>Applied. The screen shows the committed text.</figcaption>
+        </figure>
+      </div>
+      <p>The screen never sends a full tree. It sends one patch per changed
+      control, with the draft fingerprint in <code>If-Match</code>. A stale
+      fingerprint returns 409 and the screen shows the error.</p>
+      <figure>
+        <img src="assets/screenshots/06-blocked-stale.png" alt="A blocked apply: phase apply, code STALE_FINGERPRINT, and a track id.">
+        <figcaption>A stale apply. The error region shows the phase, the code, the
+        track id, the message, and the hint.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="step" id="errors">
+    <div class="step-number">7</div>
+    <div class="step-body">
+      <h3>Handle an error</h3>
+      <p>Every error is a <code>SqlCraftError</code> with a phase, a code, and a
+      hint. Print <code>display()</code> for one line.</p>
+      <pre><code>from edgesql import Query, SqlCraftError
+
+try:
+    Query.parse("DELETE FROM sales.orders", dialect="postgres")
+except SqlCraftError as error:
+    print(error.display())
+    # [parse/UNSUPPORTED_STATEMENT] This statement is DELETE. v1 changes read
+    # statements only. Hint: v1 accepts `SELECT` and `WITH ... SELECT`.
+    print(error.track_id)   # 12 lowercase hex characters</code></pre>
+      <figure>
+        <img src="assets/screenshots/08-failed-parse.png" alt="A failed parse: the error region lists phase, code, track, message, and hint.">
+        <figcaption>A failed parse in the screen. The last good draft stays.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <h2 id="done">Done</h2>
+  <p>You can now parse, inspect, rename, patch, preview, apply, and handle an error.
+  The <a href="examples.html">examples page</a> has 33 statements that cover the
+  hard shapes. The <a href="reference.html">reference</a> lists every method and
+  every code.</p>
+
+  <section class="author" id="author" aria-labelledby="author-name">
+  <img src="assets/raphael-mansuy.jpg" alt="Headshot of Raphael Mansuy, author of EdgeSQL." width="128" height="128" loading="lazy">
+  <div>
+    <h3 id="author-name">Raphael Mansuy</h3>
+    <p class="meta">Author of EdgeSQL</p>
+    <p>Raphael builds data platforms and developer tools. He works on SQL engines,
+    data pipelines, and the small libraries that make those systems easier to
+    operate. He writes about SQL, data engineering, and practical software design.</p>
+    <p>EdgeSQL started from one observation: changing SQL with string replacement
+    breaks as soon as two edits touch the same name. A typed tree with a preview
+    gate is the smallest honest fix, so he built it and tested it against the
+    official Postgres and Databricks statements.</p>
+    <p class="links">
+      <a class="btn" href="https://www.linkedin.com/in/raphaelmansuy/">Connect on LinkedIn</a>
+      <a class="btn" href="https://github.com/raphaelmansuy/EdgeSQL">Repository</a>
+    </p>
+  </div>
+</section>
+  <section class="cta-band" aria-label="Follow the work">
+  <p><strong>Building something with SQL?</strong> Tell Raphael about it.</p>
+  <a class="btn primary" href="https://www.linkedin.com/in/raphaelmansuy/">Connect on LinkedIn</a>
+</section>
+  <footer class="site-footer">
+  <div class="row">
+    <span>Copyright 2026 Raphael Mansuy. Licensed under the Apache License, Version 2.0.</span>
+    <nav>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/LICENSE">License</a>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/NOTICE">Notice</a>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL">GitHub</a>
+      <a href="https://www.linkedin.com/in/raphaelmansuy/">LinkedIn</a>
+    </nav>
+  </div>
+  <div class="row">
+    <span>SQLGlot supplies the parser and the printer and keeps its own MIT license.</span>
+    <span>EdgeSQL 0.1.0</span>
+  </div>
+</footer>
+</main>
+</body>
+</html>

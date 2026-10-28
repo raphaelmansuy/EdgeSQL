@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>EdgeSQL - change SQL on a typed tree</title>
+<meta name="description" content="EdgeSQL reads Postgres and Databricks SQL, resolves every column, and edits a typed tree with a preview gate.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Edge<span>SQL</span></a>
+    <nav class="nav">
+      <a href="index.html" aria-current="page">Overview</a>
+      <a href="tutorial.html">Tutorial</a>
+      <a href="examples.html">Examples</a>
+      <a href="reference.html">Reference</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <h1>Change SQL on a typed tree, not with string replacement.</h1>
+      <p class="lede">EdgeSQL reads a Postgres or Databricks statement, resolves every
+      column, and edits a copy of the syntax tree. You preview the change, then apply
+      it. When the change cannot be safe, it stops and names the reason.</p>
+      <div class="cta">
+        <a class="btn primary" href="tutorial.html">Start the tutorial</a>
+        <a class="btn" href="examples.html">See 33 examples</a>
+      </div>
+    </div>
+    <figure class="hero-figure">
+      <img src="assets/screenshots/02-ready-desktop.png" alt="The report helper screen: query tree, generated filter panel, and before SQL.">
+    </figure>
+  </section>
+
+  <h2 id="why">Why a typed tree</h2>
+  <p>A string edit cannot tell a column name from a comment. It cannot tell which
+  table owns a column. It breaks when two edits touch the same name. EdgeSQL keeps
+  the parsed tree instead. A rename knows the table, the CTE hops, and the output
+  name it must keep.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3>One resolver</h3>
+      <p>Scope and column rules live in one module. Filters, columns, and renames
+      all read the same answer.</p>
+      <span class="meta">postgres and databricks</span>
+    </div>
+    <div class="card">
+      <h3>Preview before commit</h3>
+      <p>Preview returns the before SQL, the after SQL, an AST diff, a semantic
+      diff, and a fingerprint. Apply refuses a blocked preview.</p>
+      <span class="meta">no silent change</span>
+    </div>
+    <div class="card">
+      <h3>Fail closed</h3>
+      <p>Every error has a phase, a code, and a hint. The library emits no SQL when
+      it cannot explain the statement.</p>
+      <span class="meta">22 catalog codes</span>
+    </div>
+    <div class="card">
+      <h3>Dynamic filter screen</h3>
+      <p>The report helper builds its filter panel from the product IR. Every
+      editable node becomes a control: number, text, range, list, or limit.</p>
+      <span class="meta">works for any query</span>
+    </div>
+  </div>
+
+  <h2 id="flow">The flow</h2>
+  <pre><code>from edgesql import Query
+
+query = Query.parse(
+    "SELECT cust_id, status FROM sales.orders",
+    dialect="postgres",
+)
+
+preview = query.preview(
+    lambda item: item.rename_column("cust_id", "customer_id", table="sales.orders")
+)
+
+if not preview.blocked:
+    applied = preview.apply(actor="builder")
+    print(applied.to_sql())
+    # SELECT customer_id AS cust_id, status FROM sales.orders</code></pre>
+
+  <p>The original query does not change. The rename keeps the output name
+  <code>cust_id</code>, so a report that reads that column still works.</p>
+
+  <h2 id="screen">The filter screen</h2>
+  <p>The example app reads the product IR and builds one row per predicate. A
+  literal value gets a typed control. A predicate that compares two columns, or
+  compares against a function, becomes a read-only row, because a value patch would
+  change the meaning.</p>
+
+  <figure>
+    <img src="assets/screenshots/17-dynamic-join-filters.png" alt="Join filters: the read-only key row and the editable boolean row.">
+    <figcaption>Join predicates. The key comparison is read-only. The boolean
+    comparison is editable.</figcaption>
+  </figure>
+
+  <div class="grid-2">
+    <figure>
+      <img src="assets/screenshots/18-between-and-in.png" alt="A range control and a list control with an added value.">
+      <figcaption>A range and a list. The list can grow.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/screenshots/19-limit-filter.png" alt="A limit control next to a range control.">
+      <figcaption>A limit control marks a cardinality change.</figcaption>
+    </figure>
+  </div>
+
+  <h2 id="next">Where to go next</h2>
+  <div class="cards">
+    <a class="card" href="tutorial.html" style="text-decoration:none;color:inherit">
+      <h3>Tutorial</h3>
+      <p>Six steps from install to a committed change, with the screen at each
+      step.</p>
+    </a>
+    <a class="card" href="examples.html" style="text-decoration:none;color:inherit">
+      <h3>Examples</h3>
+      <p>Joins, subqueries, CTEs, recursive CTEs, QUALIFY, parameters, and limits,
+      in both dialects.</p>
+    </a>
+    <a class="card" href="reference.html" style="text-decoration:none;color:inherit">
+      <h3>Reference</h3>
+      <p>The API, the error catalog, and the dialect matrix.</p>
+    </a>
+  </div>
+
+  <h2 id="author-heading">About the author</h2>
+  <section class="author" id="author" aria-labelledby="author-name">
+  <img src="assets/raphael-mansuy.jpg" alt="Headshot of Raphael Mansuy, author of EdgeSQL." width="128" height="128" loading="lazy">
+  <div>
+    <h3 id="author-name">Raphael Mansuy</h3>
+    <p class="meta">Author of EdgeSQL</p>
+    <p>Raphael builds data platforms and developer tools. He works on SQL engines,
+    data pipelines, and the small libraries that make those systems easier to
+    operate. He writes about SQL, data engineering, and practical software design.</p>
+    <p>EdgeSQL started from one observation: changing SQL with string replacement
+    breaks as soon as two edits touch the same name. A typed tree with a preview
+    gate is the smallest honest fix, so he built it and tested it against the
+    official Postgres and Databricks statements.</p>
+    <p class="links">
+      <a class="btn" href="https://www.linkedin.com/in/raphaelmansuy/">Connect on LinkedIn</a>
+      <a class="btn" href="https://github.com/raphaelmansuy/EdgeSQL">Repository</a>
+    </p>
+  </div>
+</section>
+  <section class="cta-band" aria-label="Follow the work">
+  <p><strong>Building something with SQL?</strong> Tell Raphael about it.</p>
+  <a class="btn primary" href="https://www.linkedin.com/in/raphaelmansuy/">Connect on LinkedIn</a>
+</section>
+
+  <footer class="site-footer">
+  <div class="row">
+    <span>Copyright 2026 Raphael Mansuy. Licensed under the Apache License, Version 2.0.</span>
+    <nav>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/LICENSE">License</a>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/NOTICE">Notice</a>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL">GitHub</a>
+      <a href="https://www.linkedin.com/in/raphaelmansuy/">LinkedIn</a>
+    </nav>
+  </div>
+  <div class="row">
+    <span>SQLGlot supplies the parser and the printer and keeps its own MIT license.</span>
+    <span>EdgeSQL 0.1.0</span>
+  </div>
+</footer>
+</main>
+</body>
+</html>

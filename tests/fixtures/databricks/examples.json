@@ -1,0 +1,312 @@
+[
+  {
+    "page": "select",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select",
+    "sql": "SELECT * FROM events TIMESTAMP AS OF '2018-10-18T22:15:12.013Z'\n\n\n\nSELECT * FROM events VERSION AS OF 123"
+  },
+  {
+    "page": "select",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select",
+    "sql": "SELECT * FROM events@20190101000000000\n\n\n\nSELECT * FROM events@v123"
+  },
+  {
+    "page": "qualify",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-qualify",
+    "sql": "CREATE TABLE dealer (id INT, city STRING, car_model STRING, quantity INT)"
+  },
+  {
+    "page": "qualify",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-qualify",
+    "sql": "INSERT INTO dealer VALUES\n\n(100, 'Fremont', 'Honda Civic', 10),\n\n(100, 'Fremont', 'Honda Accord', 15),\n\n(100, 'Fremont', 'Honda CRV', 7),\n\n(200, 'Dublin', 'Honda Civic', 20),\n\n(200, 'Dublin', 'Honda Accord', 10),\n\n(200, 'Dublin', 'Honda CRV', 3),\n\n(300, 'San Jose', 'Honda Civic', 5),\n\n(300, 'San Jose', 'Honda Accord', 8)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH t(x, y) AS (SELECT 1, 2)\n\nSELECT * FROM t WHERE x = 1 AND y = 2"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH t AS (\n\nWITH t2 AS (SELECT 1)\n\nSELECT * FROM t2)\n\nSELECT * FROM t"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "SELECT max(c) FROM (\n\nWITH t(c) AS (SELECT 1)\n\nSELECT * FROM t)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "SELECT (WITH t AS (SELECT 1)\n\nSELECT * FROM t)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "CREATE VIEW v AS\n\nWITH t(a, b, c, d) AS (SELECT 1, 2, 3, 4)\n\nSELECT * FROM t"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "SELECT * FROM v"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH t  AS (SELECT 1),\n\nt2 AS (\n\nWITH t AS (SELECT 2)\n\nSELECT * FROM t)\n\nSELECT * FROM t2"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "DROP VIEW IF EXISTS routes"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "CREATE TEMPORARY VIEW routes(origin, destination) AS VALUES\n\n('New York', 'Washington'),\n\n('New York', 'Boston'),\n\n('Boston', 'New York'),\n\n('Washington', 'Boston'),\n\n('Washington', 'Raleigh')"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE destinations_from_new_york AS (\n\nSELECT 'New York' AS destination, ARRAY('New York') AS path, 0 AS length\n\nUNION ALL\n\nSELECT r.destination, CONCAT(d.path, ARRAY(r.destination)), d.length + 1\n\nFROM routes AS r\n\nJOIN destinations_from_new_york AS d\n\nON d.destination = r.origin AND NOT ARRAY_CONTAINS(d.path, r.destination)\n\n)\n\nSELECT * FROM destinations_from_new_york"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "DROP TABLE IF EXISTS graph"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "CREATE TABLE IF NOT EXISTS graph( f int, t int, label string )"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "INSERT INTO graph VALUES\n\n(1, 2, 'arc 1 -> 2'),\n\n(1, 3, 'arc 1 -> 3'),\n\n(2, 3, 'arc 2 -> 3'),\n\n(1, 4, 'arc 1 -> 4'),\n\n(4, 5, 'arc 4 -> 5'),\n\n(5, 1, 'arc 5 -> 1')"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE search_graph(f, t, label, path, cycle) AS (\n\nSELECT *, array(struct(g.f, g.t)), false FROM graph g\n\nUNION ALL\n\nSELECT g.*, path || array(struct(g.f, g.t)), array_contains(path, struct(g.f, g.t))\n\nFROM graph g, search_graph sg\n\nWHERE g.f = sg.t AND NOT cycle\n\n)\n\nSELECT path FROM search_graph"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "SELECT * FROM search_graph ORDER BY path"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE r(col) AS (\n\nSELECT 'a'\n\nUNION ALL\n\nSELECT col || char(ascii(substr(col, -1)) + 1) FROM r WHERE LENGTH(col) < 10\n\n)\n\nSELECT * FROM r"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE t(n) AS (\n\nSELECT 'foo'\n\nUNION ALL\n\nSELECT n || ' bar' FROM t WHERE length(n) < 20\n\n)\n\nSELECT n AS is_text FROM t"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE x(id) AS (VALUES (1) UNION ALL SELECT id+1 FROM x WHERE id < 5),\n\ny(id) AS (VALUES (1) UNION ALL SELECT id+1 FROM x WHERE id < 10)\n\nSELECT y.*, x.* FROM y LEFT JOIN x USING (id)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE\n\ny (id) AS (VALUES (1)),\n\nx (id) AS (SELECT * FROM y UNION ALL SELECT id+1 FROM x WHERE id < 5)\n\nSELECT * FROM x"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "CREATE OR REPLACE TEMPORARY VIEW nums AS\n\nWITH RECURSIVE nums (n) AS (\n\nVALUES (1)\n\nUNION ALL\n\nSELECT n+1 FROM nums WHERE n < 6\n\n)\n\nSELECT * FROM nums"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "SELECT * FROM nums"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "CREATE TABLE rt(level INT)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE r(level) AS (\n\nVALUES (0)\n\nUNION ALL\n\nSELECT level + 1 FROM r WHERE level < 9\n\n)\n\nINSERT INTO rt SELECT * FROM r"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "SELECT * from rt"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE t(n) AS (\n\nVALUES (1)\n\nUNION ALL\n\nSELECT n+1 FROM t\n\n)\n\nSELECT * FROM t LIMIT 10"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "CREATE TABLE department (\n\nid INTEGER, -- department ID\n\nparent_department INTEGER, -- upper department ID\n\nname string -- department name\n\n)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "INSERT INTO department VALUES\n\n(0, NULL, 'ROOT'),\n\n(1, 0, 'A'),\n\n(2, 1, 'B'),\n\n(3, 2, 'C'),\n\n(4, 2, 'D'),\n\n(5, 0, 'E'),\n\n(6, 4, 'F'),\n\n(7, 5, 'G')"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE subdepartment AS (\n\nSELECT name as root_name, * FROM department WHERE name = 'A'\n\nUNION ALL\n\nSELECT sd.root_name, d.* FROM department AS d, subdepartment AS sd\n\nWHERE d.parent_department = sd.id\n\n)\n\nSELECT * FROM subdepartment ORDER BY name"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE subdepartment(level, id, parent_department, name) AS (\n\nSELECT 1, * FROM department WHERE name = 'A'\n\nUNION ALL\n\nSELECT sd.level + 1, d.* FROM department AS d, subdepartment AS sd\n\nWHERE d.parent_department = sd.id\n\n)\n\nSELECT * FROM subdepartment ORDER BY name"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE subdepartment(level, id, parent_department, name) AS (\n\nSELECT 1, * FROM department WHERE name = 'A'\n\nUNION ALL\n\nSELECT sd.level + 1, d.* FROM department AS d, subdepartment AS sd\n\nWHERE d.parent_department = sd.id\n\n)\n\nSELECT * FROM subdepartment WHERE level >= 2 ORDER BY name"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "INSERT INTO tree\n\nVALUES (1, NULL), (2, 1), (3, 1), (4, 2), (5, 2), ( 6, 2), ( 7, 3), ( 8, 3),\n\n(9,    4), (10,4), (11,7), (12,7), (13,7), (14, 9), (15,11), (16,11)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE t(id, path) AS (\n\nVALUES(1,cast(array() as array<Int>))\n\nUNION ALL\n\nSELECT tree.id, t.path || array(tree.id)\n\nFROM tree JOIN t ON (tree.parent_id = t.id)\n\n)\n\nSELECT t1.*, t2.*\n\nFROM t AS t1 JOIN t AS t2\n\nON (t1.path[0] = t2.path[0] AND\n\nsize(t1.path) = 1 AND\n\nsize(t2.path) > 1)\n\nORDER BY t1.id, t2.id"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "CREATE TABLE tree(id INTEGER, parent_id INTEGER)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "INSERT INTO tree\n\nVALUES (1, NULL), ( 2,1), (3,1 ), ( 4,2), ( 5,2), ( 6,2), ( 7, 3), ( 8, 3),\n\n(9,    4), (10,4), (11,7), (12,7), (13,7), (14,9), (15,11), (16,11)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE t(id, path) AS (\n\nVALUES(1,cast(array() as array<Int>))\n\nUNION ALL\n\nSELECT tree.id, t.path || array(tree.id)\n\nFROM tree JOIN t ON (tree.parent_id = t.id)\n\n)\n\nSELECT t1.id, count(*)\n\nFROM t AS t1 JOIN t AS t2\n\nON (t1.path[0] = t2.path[0] AND\n\nsize(t1.path) = 1 AND\n\nsize(t2.path) > 1)\n\nGROUP BY t1.id\n\nORDER BY t1.id"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "CREATE TABLE tree(id INTEGER, parent_id INTEGER)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "INSERT INTO tree\n\nVALUES (1, NULL), ( 2,1), ( 3,1), ( 4,2), ( 5,2), ( 6,2), ( 7, 3), ( 8, 3),\n\n(9,    4), (10,4), (11,7), (12,7), (13,7), (14,9), (15,11), (16,11)"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE t(id, path) AS (\n\nVALUES(1,cast(array() as array<Int>))\n\nUNION ALL\n\nSELECT tree.id, t.path || array(tree.id)\n\nFROM tree JOIN t ON (tree.parent_id = t.id)\n\n)\n\nSELECT id, path FROM t\n\nORDER BY id"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE t(n) MAX RECURSION LEVEL 10 AS (\n\nVALUES(1)\n\nUNION ALL\n\nSELECT n+1 FROM t WHERE n < 100\n\n)\n\nSELECT * FROM t"
+  },
+  {
+    "page": "cte",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-cte",
+    "sql": "WITH RECURSIVE t(n) AS (\n\nVALUES(1)\n\nUNION ALL\n\nSELECT n+1 FROM t\n\n)\n\nSELECT * FROM t LIMIT 10"
+  },
+  {
+    "page": "join",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+    "sql": "SELECT * FROM first JOIN second USING (a, b)"
+  },
+  {
+    "page": "join",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+    "sql": "SELECT first.a, first.b,\n\nfirst.* EXCEPT(a, b),\n\nsecond.* EXCEPT(a, b)\n\nFROM first JOIN second ON first.a = second.a AND first.b = second.b"
+  },
+  {
+    "page": "join",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+    "sql": "CREATE TEMP VIEW department(deptno, deptname) AS\n\nVALUES(3, 'Engineering'),\n\n(2, 'Sales'      ),\n\n(1, 'Marketing'  )"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "DECLARE stmtStr = 'SELECT current_timestamp() + :later, :x * :x AS square'"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "EXECUTE IMMEDIATE stmtStr USING INTERVAL '3' HOURS AS later, 15.0 AS x"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "EXECUTE IMMEDIATE 'SELECT 1::DECIMAL(:precision, :scale)' USING 6 AS precision, 4 AS scale"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "SELECT * FROM v"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "DECLARE stmtStr = 'SELECT current_timestamp() + ?, ? * ? AS square'"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "EXECUTE IMMEDIATE stmtStr USING INTERVAL '3' HOURS, 15.0, 15.0"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "EXECUTE IMMEDIATE 'SELECT 1::DECIMAL(?, ?)' USING 6, 4"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "SELECT * FROM v"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "CREATE EXTERNAL TABLE my_table USING DELTA LOCATION :path"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "DECLARE path STRING DEFAULT 'abfss://container@account.dfs.core.windows.net/data'"
+  },
+  {
+    "page": "param",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-parameter-marker",
+    "sql": "EXECUTE IMMEDIATE 'CREATE EXTERNAL TABLE my_table USING DELTA LOCATION \\'' || path || '\\''"
+  },
+  {
+    "page": "comment",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-comment",
+    "sql": "SELECT /* Comments are not limited to Latin characters: \u8bc4\u8bba \ud83d\ude0a */ 1"
+  },
+  {
+    "page": "comment",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-comment",
+    "sql": "SELECT /* Comments /* can be */ nested */ 1"
+  },
+  {
+    "page": "comment",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-comment",
+    "sql": "SELECT /* Quotes in '/*' comments \"/*\" are not special */ */ */ 1"
+  },
+  {
+    "page": "comment",
+    "url": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-comment",
+    "sql": "SELECT '/* This is not a comment */'"
+  }
+]

@@ -1,0 +1,4 @@
+{
+  "allow_words": ["handle", "handles"],
+  "fail_on": "warning"
+}

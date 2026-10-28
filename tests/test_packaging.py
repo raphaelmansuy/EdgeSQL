@@ -1,0 +1,105 @@
+"""Packaging, licence, and attribution. A release must not miss these."""
+
+import re
+import tomllib
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).parents[1]
+LINKEDIN = "https://www.linkedin.com/in/raphaelmansuy/"
+
+
+def _project() -> dict:
+    with (ROOT / "pyproject.toml").open("rb") as handle:
+        return tomllib.load(handle)["project"]
+
+
+def test_licence_files_exist():
+    licence = ROOT / "LICENSE"
+    assert licence.exists()
+    text = licence.read_text()
+    assert "Apache License" in text
+    assert "Version 2.0" in text
+    assert "Copyright [yyyy] [name of copyright owner]" in text
+
+
+def test_notice_names_author_and_sqlglot():
+    notice = (ROOT / "NOTICE").read_text()
+    assert "Raphael Mansuy" in notice
+    assert "Apache License, Version 2.0" in notice
+    assert LINKEDIN in notice
+    assert "SQLGlot" in notice
+    assert "MIT" in notice
+
+
+def test_metadata_is_publishable():
+    project = _project()
+    assert project["name"] == "edgesql"
+    assert project["license"] == "Apache-2.0"
+    assert project["license-files"] == ["LICENSE", "NOTICE"]
+    assert project["readme"] == "README.md"
+    assert project["dependencies"] == ["sqlglot==30.25.0"]
+    assert project["authors"][0]["name"] == "Raphael Mansuy"
+    assert project["urls"]["Author"] == LINKEDIN
+    assert project["urls"]["Documentation"].startswith("https://")
+    assert "py.typed" not in project.get("classifiers", [])
+    assert re.fullmatch(r"\d+\.\d+\.\d+", project["version"])
+
+
+def test_no_licence_classifier_when_using_an_expression():
+    # setuptools refuses both a licence expression and a licence classifier.
+    classifiers = _project()["classifiers"]
+    assert not [item for item in classifiers if item.startswith("License ::")]
+
+
+def test_typed_package_marker_exists():
+    assert (ROOT / "edgesql" / "py.typed").exists()
+
+
+def test_changelog_has_the_current_version():
+    version = _project()["version"]
+    changelog = (ROOT / "CHANGELOG.md").read_text()
+    assert f"## [{version}]" in changelog
+    assert "Keep a Changelog" in changelog
+
+
+def test_readme_has_install_and_author():
+    readme = (ROOT / "README.md").read_text()
+    assert "pip install edgesql" in readme
+    assert LINKEDIN in readme
+    assert "Apache License" in readme
+    assert "docs/assets/raphael-mansuy.jpg" in readme
+
+
+def test_workflows_exist():
+    publish = (ROOT / ".github" / "workflows" / "publish.yml").read_text()
+    pages = (ROOT / ".github" / "workflows" / "pages.yml").read_text()
+    assert "pypa/gh-action-pypi-publish" in publish
+    assert "id-token: write" in publish
+    assert "twine check" in publish
+    assert "upload-pages-artifact" in pages
+    assert "path: docs" in pages
+
+
+def test_publishing_guide_exists():
+    guide = ROOT / "docs" / "PUBLISHING.md"
+    assert guide.exists()
+    text = guide.read_text()
+    for step in ("trusted publisher", "make release-check", "make publish"):
+        assert step in text
+
+
+@pytest.mark.parametrize("page", ["index.html", "tutorial.html", "examples.html", "reference.html"])
+def test_site_has_author_and_licence(page):
+    text = (ROOT / "docs" / page).read_text()
+    assert "raphael-mansuy.jpg" in text
+    assert LINKEDIN in text
+    assert "Apache License, Version 2.0" in text
+    assert 'class="cta-band"' in text
+
+
+def test_author_photo_is_published():
+    photo = ROOT / "docs" / "assets" / "raphael-mansuy.jpg"
+    assert photo.exists()
+    assert photo.stat().st_size > 2000

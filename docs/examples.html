@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>EdgeSQL examples - joins, subqueries, CTEs, and more</title>
+<meta name="description" content="33 EdgeSQL examples in Postgres and Databricks: joins, subqueries, CTEs, recursive CTEs, QUALIFY, parameters, and limits.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Edge<span>SQL</span></a>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <a href="tutorial.html">Tutorial</a>
+      <a href="examples.html" aria-current="page">Examples</a>
+      <a href="reference.html">Reference</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>Examples</h1>
+  <p class="lede">33 statements. 19 in Postgres,
+  14 in Databricks. Every entry parses, resolves, round-trips,
+  and projects to the product IR. A test enforces that.</p>
+
+  <div class="note">
+    <p>The same list drives the example picker in the report helper. Open the app
+    with <code>make dev</code> and pick an entry. The filter panel fills itself from
+    the statement.</p>
+  </div>
+
+  <h2 id="hard">The hard shapes</h2>
+  <div class="grid-2">
+    <figure>
+      <img src="assets/screenshots/16-correlated-exists.png" alt="Correlated EXISTS: the outer table appears in the inner predicate.">
+      <figcaption>Correlated <code>EXISTS</code>. The inner predicate reads
+      <code>sales.customers.id</code> from the outer scope.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/screenshots/14-cte-highlight.png" alt="A CTE that feeds a join, with the CTE name in the filter heading.">
+      <figcaption>A CTE feeding a join. The filter heading names the scope,
+      <code>where &middot; paid</code>.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/screenshots/10-qualify-tree.png" alt="A Databricks QUALIFY statement with the rank predicate as an editable row.">
+      <figcaption>Databricks <code>QUALIFY</code>. The rank predicate is editable on
+      Databricks and refused on Postgres.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/screenshots/15-parameter-highlight.png" alt="A named parameter marker coloured as a parameter in the tree and the SQL.">
+      <figcaption>A named parameter marker. The marker keeps its own colour and
+      stays printable.</figcaption>
+    </figure>
+  </div>
+
+  <h2 id="dynamic">One panel for any query</h2>
+  <p>The filter panel is not a fixed form. It walks the product IR and builds one
+  row per predicate. A literal value gets a typed control. A comparison between two
+  columns becomes a read-only row, because a value patch would change the meaning.</p>
+
+  <div class="grid-2">
+    <figure>
+      <img src="assets/screenshots/17-dynamic-join-filters.png" alt="Join filters with a read-only key row and an editable boolean row.">
+      <figcaption>Join predicates: one read-only key, one editable boolean.</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/screenshots/20-readonly-predicate.png" alt="A range control, a read-only LIKE row, and a parameter field.">
+      <figcaption>A range, a read-only <code>LIKE</code>, and a parameter field in
+      one clause.</figcaption>
+    </figure>
+  </div>
+
+  <h2 id="postgres">Postgres (19)</h2>
+  <div class="gallery">
+<article class="example" data-dialect="postgres"><h3>Simple filter</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">where</span></div><pre><code>SELECT cust_id, status, amount
+FROM sales.orders
+WHERE status = &#x27;paid&#x27;</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Inner join with two predicates</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">join</span></div><pre><code>SELECT c.region, SUM(o.amount) AS total
+FROM sales.orders o
+JOIN sales.customers c ON c.id = o.cust_id AND c.active = TRUE
+WHERE o.status = &#x27;paid&#x27;
+GROUP BY c.region</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Three filter kinds in one WHERE</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">where</span><span class="tag">in</span><span class="tag">between</span></div><pre><code>SELECT id, cust_id, amount, region
+FROM sales.orders
+WHERE status = &#x27;paid&#x27;
+  AND amount BETWEEN 100 AND 500
+  AND region IN (&#x27;EU&#x27;, &#x27;US&#x27;)</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Left join used as an anti join</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">join</span><span class="tag">null</span></div><pre><code>SELECT c.id, c.email
+FROM sales.customers c
+LEFT JOIN sales.orders o ON o.cust_id = c.id
+WHERE o.id IS NULL</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Three way join</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">join</span></div><pre><code>SELECT o.id, c.email, p.method, p.amount
+FROM sales.orders o
+JOIN sales.customers c ON c.id = o.cust_id
+JOIN sales.payments p ON p.order_id = o.id AND p.amount &gt; 0
+WHERE c.region IN (&#x27;EU&#x27;, &#x27;US&#x27;)</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Self join for the previous order</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">join</span><span class="tag">window</span></div><pre><code>SELECT curr.id, prev.id AS previous_id
+FROM sales.orders curr
+LEFT JOIN sales.orders prev
+  ON prev.cust_id = curr.cust_id AND prev.created_at &lt; curr.created_at
+WHERE curr.status = &#x27;open&#x27;</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Correlated EXISTS</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">subquery</span><span class="tag">exists</span></div><pre><code>SELECT c.id, c.email
+FROM sales.customers c
+WHERE EXISTS (
+  SELECT 1 FROM sales.orders o
+  WHERE o.cust_id = c.id AND o.status = &#x27;paid&#x27;
+)</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Correlated NOT EXISTS</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">subquery</span><span class="tag">exists</span></div><pre><code>SELECT c.id
+FROM sales.customers c
+WHERE NOT EXISTS (
+  SELECT 1 FROM sales.orders o
+  WHERE o.cust_id = c.id AND o.amount &gt; 500
+)</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Scalar subquery in the projection</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">subquery</span><span class="tag">aggregate</span></div><pre><code>SELECT o.id, o.amount,
+  (SELECT MAX(p.amount) FROM sales.payments p WHERE p.order_id = o.id) AS largest_payment
+FROM sales.orders o
+WHERE o.amount &gt; 50</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>IN against a subquery</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">subquery</span><span class="tag">in</span></div><pre><code>SELECT c.id
+FROM sales.customers c
+WHERE c.region IN (
+  SELECT r.code FROM sales.regions r WHERE r.active
+)</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Derived table with a filter</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">subquery</span></div><pre><code>SELECT t.cust_id, t.total
+FROM (
+  SELECT o.cust_id, SUM(o.amount) AS total
+  FROM sales.orders o
+  GROUP BY o.cust_id
+) t
+WHERE t.total &gt; 1000</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>CTE feeding a join</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">cte</span><span class="tag">join</span></div><pre><code>WITH paid AS (
+  SELECT o.cust_id, SUM(o.amount) AS total
+  FROM sales.orders o
+  WHERE o.status = &#x27;paid&#x27;
+  GROUP BY o.cust_id
+)
+SELECT c.region, COUNT(*) AS customers
+FROM paid p
+JOIN sales.customers c ON c.id = p.cust_id
+GROUP BY c.region</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Two CTEs, one joined to the other</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">cte</span><span class="tag">join</span></div><pre><code>WITH paid AS (
+  SELECT cust_id, SUM(amount) AS total FROM sales.orders
+  WHERE status = &#x27;paid&#x27; GROUP BY cust_id
+),
+big AS (
+  SELECT cust_id FROM paid WHERE total &gt; 1000
+)
+SELECT c.id, c.email
+FROM sales.customers c
+JOIN big b ON b.cust_id = c.id
+WHERE c.active</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Recursive CTE over an org tree</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">cte</span><span class="tag">recursive</span></div><pre><code>WITH RECURSIVE tree AS (
+  SELECT id, manager_id, 1 AS depth
+  FROM hr.employees
+  WHERE manager_id IS NULL
+  UNION ALL
+  SELECT e.id, e.manager_id, t.depth + 1
+  FROM hr.employees e
+  JOIN tree t ON e.manager_id = t.id
+)
+SELECT id, depth FROM tree WHERE depth &lt; 5</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>Window function with QUALIFY-free ranking</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">window</span><span class="tag">subquery</span></div><pre><code>SELECT id, cust_id, amount
+FROM (
+  SELECT id, cust_id, amount,
+    ROW_NUMBER() OVER (PARTITION BY cust_id ORDER BY amount DESC) AS rn
+  FROM sales.orders
+) ranked
+WHERE rn = 1</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>UNION of two branches</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">set</span></div><pre><code>SELECT cust_id FROM sales.orders WHERE status = &#x27;paid&#x27;
+UNION
+SELECT cust_id FROM sales.refunds WHERE settled</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>BETWEEN, LIKE, and a parameter</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">where</span><span class="tag">param</span></div><pre><code>SELECT id, amount
+FROM sales.orders
+WHERE amount BETWEEN 10 AND 500
+  AND email LIKE &#x27;%@example.com&#x27;
+  AND status = $1</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>DISTINCT ON keeps the first row</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span></div><pre><code>SELECT DISTINCT ON (cust_id) cust_id, id, created_at
+FROM sales.orders
+ORDER BY cust_id, created_at DESC</code></pre></article>
+<article class="example" data-dialect="postgres"><h3>LATERAL join to a top-three subquery</h3><div class="tags"><span class="tag" data-dialect="postgres">postgres</span><span class="tag">join</span><span class="tag">subquery</span></div><pre><code>SELECT c.id, top.id AS order_id, top.amount
+FROM sales.customers c
+JOIN LATERAL (
+  SELECT o.id, o.amount FROM sales.orders o
+  WHERE o.cust_id = c.id
+  ORDER BY o.amount DESC
+  LIMIT 3
+) top ON TRUE
+WHERE c.region = &#x27;EU&#x27;</code></pre></article>
+  </div>
+
+  <h2 id="databricks">Databricks (14)</h2>
+  <div class="gallery">
+<article class="example" data-dialect="databricks"><h3>Simple filter</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">where</span></div><pre><code>SELECT cust_id, status, amount
+FROM sales.orders
+WHERE status = &#x27;paid&#x27;</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>QUALIFY on a window function</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">qualify</span><span class="tag">window</span></div><pre><code>SELECT city, car_model, quantity
+FROM dealer
+QUALIFY RANK() OVER (PARTITION BY car_model ORDER BY quantity) = 1</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>QUALIFY references an output alias</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">qualify</span></div><pre><code>SELECT city, car_model,
+  RANK() OVER (PARTITION BY car_model ORDER BY quantity) AS rank
+FROM dealer
+QUALIFY rank = 1</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>SEMI join</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">join</span></div><pre><code>SELECT o.id, o.amount
+FROM sales.orders o
+LEFT SEMI JOIN sales.customers c ON c.id = o.cust_id
+WHERE o.status = &#x27;paid&#x27;</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>ANTI join</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">join</span></div><pre><code>SELECT c.id
+FROM sales.customers c
+LEFT ANTI JOIN sales.orders o ON o.cust_id = c.id</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>CTE with a QUALIFY step</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">cte</span><span class="tag">qualify</span></div><pre><code>WITH recent AS (
+  SELECT cust_id, id, amount, created_at
+  FROM sales.orders
+  WHERE created_at &gt;= &#x27;2026-01-01&#x27;
+)
+SELECT cust_id, id, amount
+FROM recent
+QUALIFY ROW_NUMBER() OVER (PARTITION BY cust_id ORDER BY created_at DESC) = 1</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>Recursive CTE with MAX RECURSION</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">cte</span><span class="tag">recursive</span></div><pre><code>WITH RECURSIVE t(n) AS (
+  SELECT 1
+  UNION ALL
+  SELECT n + 1 FROM t WHERE n &lt; 5
+)
+MAX RECURSION LEVEL 10
+SELECT * FROM t</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>Named parameter marker</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">param</span></div><pre><code>SELECT trip_distance, fare_amount
+FROM samples.nyctaxi.trips
+WHERE fare_amount &lt; :fare_parameter</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>Three positional markers</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">param</span></div><pre><code>SELECT current_timestamp() + ?, ? * ? AS square</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>Join to a grouped subquery</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">join</span><span class="tag">subquery</span></div><pre><code>SELECT c.id, t.total
+FROM sales.customers c
+JOIN (
+  SELECT cust_id, SUM(amount) AS total
+  FROM sales.orders
+  GROUP BY cust_id
+) t ON t.cust_id = c.id
+WHERE t.total &gt; 100</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>Correlated EXISTS</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">subquery</span><span class="tag">exists</span></div><pre><code>SELECT c.id
+FROM sales.customers c
+WHERE EXISTS (
+  SELECT 1 FROM sales.orders o WHERE o.cust_id = c.id
+)</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>Three CTE layers</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">cte</span></div><pre><code>WITH base AS (
+  SELECT cust_id, amount, status FROM sales.orders
+),
+paid AS (
+  SELECT cust_id, SUM(amount) AS total FROM base WHERE status = &#x27;paid&#x27; GROUP BY cust_id
+),
+top AS (
+  SELECT cust_id, total FROM paid WHERE total &gt; 500
+)
+SELECT c.id, top.total
+FROM sales.customers c
+JOIN top ON top.cust_id = c.id</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>Limit the newest rows</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">limit</span></div><pre><code>SELECT id, created_at
+FROM sales.orders
+WHERE status = &#x27;open&#x27;
+ORDER BY created_at DESC
+LIMIT 25</code></pre></article>
+<article class="example" data-dialect="databricks"><h3>Range and row limit</h3><div class="tags"><span class="tag" data-dialect="databricks">databricks</span><span class="tag">where</span><span class="tag">between</span><span class="tag">limit</span></div><pre><code>SELECT id, amount
+FROM sales.orders
+WHERE amount BETWEEN 10 AND 250
+  AND status = &#x27;paid&#x27;
+LIMIT 10</code></pre></article>
+  </div>
+
+<section class="author" id="author" aria-labelledby="author-name">
+  <img src="assets/raphael-mansuy.jpg" alt="Headshot of Raphael Mansuy, author of EdgeSQL." width="128" height="128" loading="lazy">
+  <div>
+    <h3 id="author-name">Raphael Mansuy</h3>
+    <p class="meta">Author of EdgeSQL</p>
+    <p>Raphael builds data platforms and developer tools. He works on SQL engines,
+    data pipelines, and the small libraries that make those systems easier to
+    operate. He writes about SQL, data engineering, and practical software design.</p>
+    <p>EdgeSQL started from one observation: changing SQL with string replacement
+    breaks as soon as two edits touch the same name. A typed tree with a preview
+    gate is the smallest honest fix, so he built it and tested it against the
+    official Postgres and Databricks statements.</p>
+    <p class="links">
+      <a class="btn" href="https://www.linkedin.com/in/raphaelmansuy/">Connect on LinkedIn</a>
+      <a class="btn" href="https://github.com/raphaelmansuy/EdgeSQL">Repository</a>
+    </p>
+  </div>
+</section>
+
+<section class="cta-band" aria-label="Follow the work">
+  <p><strong>Building something with SQL?</strong> Tell Raphael about it.</p>
+  <a class="btn primary" href="https://www.linkedin.com/in/raphaelmansuy/">Connect on LinkedIn</a>
+</section>
+
+<footer class="site-footer">
+  <div class="row">
+    <span>Copyright 2026 Raphael Mansuy. Licensed under the Apache License, Version 2.0.</span>
+    <nav>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/LICENSE">License</a>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL/blob/main/NOTICE">Notice</a>
+      <a href="https://github.com/raphaelmansuy/EdgeSQL">GitHub</a>
+      <a href="https://www.linkedin.com/in/raphaelmansuy/">LinkedIn</a>
+    </nav>
+  </div>
+  <div class="row">
+    <span>SQLGlot supplies the parser and the printer and keeps its own MIT license.</span>
+    <span>EdgeSQL 0.1.0</span>
+  </div>
+</footer>
+</main>
+</body>
+</html>

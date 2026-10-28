@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="__CSRF_TOKEN__">
+  <meta name="color-scheme" content="light">
+  <title>Report helper</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1a1814;
+      --page: #f3efe6;
+      --panel: #fffdf8;
+      --line: #cfc6b6;
+      --line-strong: #1a1814;
+      --quiet: #5b5347;
+      --sunken: #ebe4d7;
+      --step: 8px;
+      /* SQL syntax */
+      --syn-keyword: #8a2f5f;
+      --syn-function: #1f5f8b;
+      --syn-table: #1f5f8b;
+      --syn-string: #2f6b3a;
+      --syn-number: #a34a12;
+      --syn-param: #7a3ba8;
+      --syn-param-bg: #f0e6f8;
+      --syn-filter: #8a5a00;
+      --syn-filter-bg: #fbf0d6;
+      --syn-comment: #6b6355;
+      --syn-operator: #4a4438;
+      --syn-punct: #6b6355;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+    h2 { margin: 0; font-size: 14px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.08em; }
+    p { margin: 0; }
+    .meta { font-size: 14px; color: var(--quiet); }
+    code, pre, .sql { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    button, input, select, textarea { font: inherit; color: var(--ink); background: var(--panel); }
+    button {
+      min-height: 40px;
+      padding: 8px 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 2px;
+      cursor: pointer;
+      background: var(--panel);
+    }
+    button:hover:not(:disabled) { background: var(--sunken); }
+    button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+    button.primary:hover:not(:disabled) { background: #322d26; }
+    button.ghost {
+      border-color: transparent;
+      background: transparent;
+      min-height: 32px;
+      padding: 4px 8px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    button.ghost:hover:not(:disabled) { background: var(--sunken); }
+    button:disabled {
+      cursor: not-allowed;
+      color: var(--quiet);
+      background: var(--sunken);
+      border-color: var(--quiet);
+    }
+    input[type="radio"] { accent-color: var(--ink); }
+    input[type="text"], select, textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--line-strong);
+      border-radius: 2px;
+      background: var(--panel);
+    }
+    input[type="text"] { max-width: 32ch; }
+    textarea { resize: vertical; }
+    fieldset {
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      margin: 8px 0;
+      padding: 8px 16px;
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    legend { padding: 0 8px; }
+    fieldset label, .radio { display: flex; align-items: center; gap: 8px; width: auto; }
+    input[type="radio"] { width: 16px; height: 16px; margin: 0; }
+    button:focus-visible, input:focus-visible, select:focus-visible,
+    textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+    }
+
+    .page {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+      display: grid;
+      gap: 16px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .chip {
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      padding: 2px 12px;
+      background: var(--panel);
+      white-space: nowrap;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+    .columns { display: grid; gap: 16px; grid-template-columns: 1.15fr 1fr; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .actions .meta { margin-left: 8px; }
+    .stack { display: grid; gap: 8px; align-content: start; }
+    .hint-row { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+
+    .state-word {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 650;
+    }
+    .badge {
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      padding: 0 12px;
+      background: var(--sunken);
+      font-size: 14px;
+      font-weight: 650;
+    }
+    body[data-state="green"] .badge,
+    body[data-state="applied"] .badge { background: var(--ink); color: var(--panel); }
+
+    #tree { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+    #tree ul {
+      list-style: none;
+      margin: 2px 0 2px 7px;
+      padding: 0 0 0 16px;
+      border-left: 1px solid var(--line);
+      display: grid;
+      gap: 2px;
+    }
+    #tree li { padding: 2px 0; line-height: 1.4; }
+    #tree .kw { font-weight: 650; letter-spacing: 0.04em; }
+    #tree .val { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+    #tree .empty { color: var(--quiet); font-style: italic; }
+    #tree li[data-kind="CTE"] > .kw,
+    #tree li[data-kind="Select"] > .kw,
+    #tree li[data-kind="Where"] > .kw,
+    #tree li[data-kind="Having"] > .kw,
+    #tree li[data-kind="Qualify"] > .kw,
+    #tree li[data-kind="Limit"] > .kw { color: var(--syn-keyword); }
+    #tree li[data-kind="From"] > .kw,
+    #tree li[data-kind="Join"] > .kw { color: var(--syn-table); }
+    .editable {
+      margin-left: 8px;
+      font-size: 12px;
+      border: 1px solid var(--syn-filter);
+      color: var(--syn-filter);
+      background: var(--syn-filter-bg);
+      border-radius: 999px;
+      padding: 0 8px;
+      font-family: system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .sql-row { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+    .sql-row .panel { gap: 0; padding: 0; }
+    .sql-row h2 { padding: 16px 16px 8px; }
+    .sql-row pre {
+      margin: 0;
+      padding: 8px 16px 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border-top: 1px solid var(--line);
+      min-height: 96px;
+    }
+    #after-sql[data-empty="true"] { color: var(--quiet); font-style: italic; }
+
+    /* SQL token colours */
+    .tok-kw { color: var(--syn-keyword); font-weight: 650; }
+    .tok-fn { color: var(--syn-function); }
+    .tok-tbl { color: var(--syn-table); }
+    .tok-str { color: var(--syn-string); }
+    .tok-num { color: var(--syn-number); }
+    .tok-op { color: var(--syn-operator); }
+    .tok-punct { color: var(--syn-punct); }
+    .tok-comment { color: var(--syn-comment); font-style: italic; }
+    .tok-param {
+      color: var(--syn-param);
+      background: var(--syn-param-bg);
+      border: 1px solid #ddc8ee;
+      border-radius: 2px;
+      padding: 0 4px;
+      font-weight: 600;
+    }
+    .tok-filter {
+      color: var(--syn-filter);
+      background: var(--syn-filter-bg);
+      border-radius: 2px;
+      padding: 0 2px;
+    }
+    .tok-filter-value {
+      color: var(--syn-filter);
+      background: var(--syn-filter-bg);
+      border: 1px solid #e2cd9a;
+      border-radius: 2px;
+      padding: 0 4px;
+      font-weight: 600;
+    }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 14px;
+      color: var(--quiet);
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      display: inline-block;
+      border: 1px solid var(--line);
+    }
+
+    #error {
+      border: 2px solid var(--line-strong);
+      display: grid;
+      gap: 8px;
+    }
+    #error:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    #error dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 0 16px; }
+    #error dt { font-size: 14px; color: var(--quiet); }
+    #error dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+    #error .message { font-family: inherit; font-size: 16px; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--quiet);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--line);
+    }
+    .examples {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+    .filter-groups { display: grid; gap: 16px; }
+    .filter-group { display: grid; gap: 8px; }
+    .filter-group > h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+      color: var(--quiet);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 4px;
+    }
+    .filter-row { display: grid; gap: 4px; }
+    .filter-row .label-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .filter-row .label-line strong { font-weight: 650; }
+    .filter-row input[type="text"],
+    .filter-row input[type="number"],
+    .filter-row select { max-width: 32ch; }
+    .filter-row.readonly {
+      border-left: 3px solid var(--line);
+      padding-left: 8px;
+      background: var(--page);
+    }
+    .filter-row.readonly .ro-sql {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+    .filter-row .range { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .filter-row .range input { max-width: 12ch; }
+    .filter-row .members { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .filter-row .members input { max-width: 14ch; }
+    .filter-row button.small {
+      min-height: 32px;
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+    .filter-row .errors {
+      font-size: 14px;
+      color: #8a1f1f;
+    }
+    .example {
+      text-align: left;
+      display: grid;
+      gap: 4px;
+      align-content: start;
+      padding: 8px 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+    .example:hover:not(:disabled) { background: var(--sunken); border-color: var(--line-strong); }
+    .example[data-dialect="postgres"] { border-left: 4px solid var(--syn-function); }
+    .example[data-dialect="databricks"] { border-left: 4px solid var(--syn-param); }
+    .example .name { font-weight: 650; }
+    .example .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+    .tag {
+      font-size: 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0 8px;
+      color: var(--quiet);
+      background: var(--page);
+      text-transform: lowercase;
+    }
+    .tag[data-dialect] { font-weight: 650; }
+    .tag[data-dialect="postgres"] { color: var(--syn-function); border-color: var(--syn-function); }
+    .tag[data-dialect="databricks"] { color: var(--syn-param); border-color: var(--syn-param); }
+
+    details { border-top: 1px solid var(--line); padding-top: 8px; }
+    summary { cursor: pointer; font-size: 14px; color: var(--quiet); padding: 8px 0; }
+    summary:hover { color: var(--ink); }
+
+    .toast { font-size: 14px; color: var(--quiet); min-height: 20px; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 760px) {
+      .columns, .sql-row { grid-template-columns: 1fr; }
+      .page { padding: 16px 12px 32px; }
+      .actions { width: 100%; }
+      .actions button { flex: 1 1 auto; }
+      .actions .meta { margin-left: 0; flex-basis: 100%; }
+    }
+  </style>
+</head>
+<body data-state="empty">
+  <main class="page">
+    <header class="header">
+      <h1>Report helper</h1>
+      <div class="header-right">
+        <button type="button" id="new-query" class="ghost hidden">New query</button>
+        <p class="meta chip" id="dialect-chip">Dialect: none</p>
+      </div>
+    </header>
+
+    <section id="empty" class="panel">
+      <p>Paste a SELECT on sales.orders, or load the sample.</p>
+      <div class="actions">
+        <button type="button" id="load-sample" class="primary">Load sample</button>
+        <button type="button" id="preview-empty" disabled>Preview</button>
+        <button type="button" id="apply-empty" disabled>Apply</button>
+        <span class="meta">Apply is disabled</span>
+      </div>
+      <details id="paste">
+        <summary>Paste SQL or pick an example</summary>
+        <div class="stack">
+          <label class="meta" for="sql-input">SQL</label>
+          <textarea id="sql-input" rows="6" spellcheck="false" placeholder="Paste a SELECT statement here"></textarea>
+          <fieldset>
+            <legend class="meta">Dialect before parse</legend>
+            <label><input type="radio" name="dialect" value="postgres" checked> postgres</label>
+            <label><input type="radio" name="dialect" value="databricks"> databricks</label>
+          </fieldset>
+          <div class="actions">
+            <button type="button" id="parse-sql">Parse</button>
+          </div>
+          <div class="divider"><span>or pick an example</span></div>
+          <div class="examples" id="examples" role="list"></div>
+        </div>
+      </details>
+    </section>
+
+    <section id="work" class="hidden">
+      <div class="columns">
+        <section class="panel tree" aria-labelledby="tree-title">
+          <h2 id="tree-title">Query tree</h2>
+          <ul id="tree" aria-live="polite"></ul>
+        </section>
+        <section class="panel filters" aria-labelledby="filters-title">
+          <h2 id="filters-title">Filters</h2>
+          <div id="filter-groups" class="filter-groups"></div>
+          <p class="meta hidden" id="no-lane">This query has no editable value. Structure is read-only.</p>
+          <div class="actions">
+            <button type="button" id="preview" class="primary">Preview</button>
+            <button type="button" id="apply" disabled>Apply</button>
+            <span class="meta" id="apply-hint">Apply is disabled</span>
+          </div>
+          <p class="toast" id="toast" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </section>
+
+    <section id="result" class="stack hidden">
+      <p class="state-word"><span class="meta">Status:</span> <span class="badge" id="status-word" role="status" aria-live="polite">Ready</span></p>
+      <div id="error" class="panel hidden" tabindex="-1" role="alert">
+        <strong>Blocked</strong>
+        <dl>
+          <dt>phase</dt><dd id="err-phase"></dd>
+          <dt>code</dt><dd id="err-code"></dd>
+          <dt>track</dt><dd id="err-track"></dd>
+        </dl>
+        <p class="message" id="err-message"></p>
+        <p class="meta" id="err-hint"></p>
+      </div>
+      <div class="sql-row" id="sql-row">
+        <section class="panel">
+          <h2 id="before-label">Before</h2>
+          <pre id="before-sql"></pre>
+        </section>
+        <section class="panel">
+          <h2>After</h2>
+          <pre id="after-sql" data-empty="true">(same until Preview)</pre>
+        </section>
+      </div>
+      <p class="legend">
+        <span><i class="swatch" style="background: var(--syn-keyword)"></i>keyword</span>
+        <span><i class="swatch" style="background: var(--syn-table)"></i>table / function</span>
+        <span><i class="swatch" style="background: var(--syn-string)"></i>string</span>
+        <span><i class="swatch" style="background: var(--syn-number)"></i>number</span>
+        <span><i class="swatch" style="background: var(--syn-param)"></i>parameter</span>
+        <span><i class="swatch" style="background: var(--syn-filter)"></i>filter value</span>
+      </p>
+    </section>
+  </main>
+  <script>
+    const SAMPLE = "SELECT cust_id, status, amount\nFROM sales.orders\nWHERE cust_id = 42 AND status = 'paid'";
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+    const state = {
+      draftId: null,
+      fingerprint: null,
+      previewFingerprint: null,
+      dialect: null,
+      nodes: {},
+      original: [],
+      editableCount: 0,
+      parsed: false,
+      busy: false,
+      filterMarks: [],
+    };
+    window.reportState = state;
+
+    const el = (id) => document.getElementById(id);
+
+    function headers() {
+      return { "Content-Type": "application/json", "X-CSRF-Token": token };
+    }
+
+    async function api(path, options) {
+      const response = await fetch(path, options);
+      let body = {};
+      try { body = await response.json(); } catch (error) { body = { message: "The server sent no JSON." }; }
+      if (!response.ok) {
+        const failure = new Error(body.message || "request failed");
+        failure.body = body;
+        failure.status = response.status;
+        throw failure;
+      }
+      return body;
+    }
+
+    function setChip(dialect) {
+      el("dialect-chip").textContent = "Dialect: " + (dialect || "none");
+    }
+
+    function setStatus(word, key) {
+      el("status-word").textContent = word;
+      document.body.dataset.state = key;
+    }
+
+    function setBusy(busy) {
+      state.busy = busy;
+      el("preview").disabled = busy;
+      el("parse-sql").disabled = busy;
+      el("load-sample").disabled = busy;
+      el("work").setAttribute("aria-busy", busy ? "true" : "false");
+      el("toast").textContent = busy ? "Working…" : "";
+      if (busy) el("apply").disabled = true;
+    }
+
+    function showError(body) {
+      el("err-phase").textContent = body.phase || "";
+      el("err-code").textContent = body.code || "";
+      el("err-track").textContent = body.track_id || "";
+      el("err-message").textContent = body.message || "";
+      el("err-hint").textContent = body.hint || "";
+      el("err-hint").classList.toggle("hidden", !body.hint);
+      const region = el("error");
+      region.classList.remove("hidden");
+      setStatus("Blocked", "blocked");
+      el("apply").disabled = true;
+      el("apply-hint").textContent = "Apply stays disabled";
+      el("result").classList.remove("hidden");
+      el("new-query").classList.remove("hidden");
+      el("sql-row").classList.toggle("hidden", !state.draftId);
+      region.focus();
+    }
+
+    function clearError() {
+      const region = el("error");
+      region.classList.add("hidden");
+    }
+
+    function setAfter(text, filterValues) {
+      const node = el("after-sql");
+      node.dataset.empty = text === "(same until Preview)" ? "true" : "false";
+      paint(node, text, filterValues || []);
+    }
+
+    /* SQL syntax colouring. Tokens keep their text, so a copy stays plain SQL. */
+    const KEYWORDS = new Set(("SELECT FROM WHERE AND OR NOT JOIN LEFT RIGHT FULL INNER OUTER CROSS SEMI ANTI " +
+      "LATERAL ON USING GROUP BY HAVING QUALIFY ORDER LIMIT OFFSET UNION ALL INTERSECT EXCEPT DISTINCT " +
+      "WITH RECURSIVE AS IN IS NULL TRUE FALSE BETWEEN LIKE ILIKE EXISTS CASE WHEN THEN ELSE END ASC DESC " +
+      "MAX MIN CURRENT_TIMESTAMP INTERVAL ROW_NUMBER RANK DENSE_RANK").split(" "));
+    const FUNCTIONS = new Set(("SUM COUNT AVG MIN MAX ROW_NUMBER RANK DENSE_RANK COALESCE CAST " +
+      "CURRENT_TIMESTAMP NOW ARRAY_CONTAINS").split(" "));
+
+    function tokenizeSql(text) {
+      const tokens = [];
+      const pattern = new RegExp([
+        "(?<comment>--[^\\n]*)",
+        "(?<block>/\\*[\\s\\S]*?\\*/)",
+        "(?<param>\\$\\d+|%\([A-Za-z_][A-Za-z0-9_]*\)s|:[A-Za-z_][A-Za-z0-9_]*|\\?)",
+        "(?<str>'(?:[^']|'')*')",
+        "(?<num>\\b\\d+(?:\\.\\d+)?\\b)",
+        "(?<ident>[A-Za-z_][A-Za-z0-9_.]*)",
+        "(?<op><>|!=|>=|<=|=|<|>|\\|\\||\\+|-|\\*|/)",
+        "(?<punct>[(),;.\\[\\]])",
+        "(?<space>\\s+)",
+        "(?<other>.)",
+      ].join("|"), "g");
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const groups = match.groups || {};
+        for (const [kind, value] of Object.entries(groups)) {
+          if (value !== undefined) {
+            tokens.push({ kind, value });
+            break;
+          }
+        }
+      }
+      return tokens;
+    }
+
+    function paint(node, text, filterValues) {
+      node.textContent = "";
+      if (!text) return;
+      const marks = new Set((filterValues || []).map((value) => String(value)));
+      const tokens = tokenizeSql(text);
+      let previous = "";
+      for (const token of tokens) {
+        const span = document.createElement("span");
+        span.textContent = token.value;
+        const upper = token.value.toUpperCase();
+        if (token.kind === "comment" || token.kind === "block") span.className = "tok-comment";
+        else if (token.kind === "param") span.className = "tok-param";
+        else if (token.kind === "str") {
+          span.className = marks.has(token.value.slice(1, -1)) ? "tok-filter" : "tok-str";
+        } else if (token.kind === "num") {
+          span.className = marks.has(token.value) ? "tok-filter" : "tok-num";
+        } else if (token.kind === "ident") {
+          if (previous === ".") span.className = "tok-tbl";
+          else if (KEYWORDS.has(upper)) span.className = "tok-kw";
+          else if (FUNCTIONS.has(upper)) span.className = "tok-fn";
+          else span.className = "tok-tbl";
+        } else if (token.kind === "op") span.className = "tok-op";
+        else if (token.kind === "punct") span.className = "tok-punct";
+        if (token.kind !== "space") previous = token.value;
+        node.appendChild(span);
+      }
+    }
+
+    function filterValues(documentIr) {
+      const values = [];
+      for (const node of Object.values(documentIr.nodes || {})) {
+        if (node.kind === "Comparison" && node.right && node.right.value !== undefined) {
+          const value = node.right.value;
+          if (value === null || typeof value !== "object") values.push(value);
+        }
+        if (node.kind === "InList") values.push(...(node.values || []));
+        if (node.kind === "Between") values.push(node.low, node.high);
+      }
+      return values;
+    }
+
+    function literal(value) {
+      if (value === null || value === undefined) return "NULL";
+      if (typeof value === "object") return value.expr !== undefined ? value.expr : JSON.stringify(value);
+      if (typeof value === "boolean") return String(value).toUpperCase();
+      if (typeof value === "number") return String(value);
+      return "'" + String(value) + "'";
+    }
+
+    function parts(node) {
+      if (node.kind === "Select") return ["SELECT", (node.projection || []).join(", ")];
+      if (node.kind === "From") return ["FROM", node.table || ""];
+      if (node.kind === "Join") return ["JOIN", node.table || ""];
+      if (node.kind === "Where") return ["WHERE", ""];
+      if (node.kind === "Having") return ["HAVING", ""];
+      if (node.kind === "Qualify") return ["QUALIFY", ""];
+      if (node.kind === "CTE") return ["WITH", node.name || ""];
+      if (node.kind === "Limit") return ["LIMIT", String(node.value)];
+      if (node.text) return ["", node.text];
+      if (node.kind === "Comparison" || node.kind === "Between" || node.kind === "InList") return ["", ""];
+      return ["", node.kind];
+    }
+
+    function chip(text, cls) {
+      const span = document.createElement("span");
+      span.className = cls;
+      span.textContent = text;
+      return span;
+    }
+
+    function renderComparison(item, node) {
+      const left = node.left || {};
+      const label = left.column !== undefined ? left.column : (left.expr !== undefined ? left.expr : "expr");
+      item.appendChild(chip(label, "tok-tbl"));
+      item.append(" ");
+      if (node.kind === "Between") {
+        item.appendChild(chip("BETWEEN", "tok-kw"));
+        item.append(" ");
+        item.appendChild(chip(literal(node.low), "tok-filter-value"));
+        item.append(" ");
+        item.appendChild(chip("AND", "tok-kw"));
+        item.append(" ");
+        item.appendChild(chip(literal(node.high), "tok-filter-value"));
+        return;
+      }
+      if (node.kind === "InList") {
+        item.appendChild(chip("IN", "tok-kw"));
+        item.append(" (");
+        (node.values || []).forEach((value, index) => {
+          if (index) item.append(", ");
+          item.appendChild(chip(literal(value), "tok-filter-value"));
+        });
+        item.append(")");
+        return;
+      }
+      item.appendChild(chip(node.op || "=", "tok-op"));
+      item.append(" ");
+      const right = node.right || {};
+      const value = right.value;
+      if (value && typeof value === "object" && value.param !== undefined) {
+        item.appendChild(chip(markerText(value.param), "tok-param"));
+      } else if (value && typeof value === "object" && value.expr !== undefined) {
+        item.appendChild(chip(value.expr, "tok-fn"));
+      } else {
+        item.appendChild(chip(literal(value), "tok-filter-value"));
+      }
+    }
+
+    function markerText(name) {
+      const text = String(name);
+      if (text === "?") return "?";
+      if (text.startsWith("$") || text.startsWith("%(") || text.startsWith(":")) return text;
+      if (/^\d+$/.test(text)) return "$" + text;
+      return ":" + text;
+    }
+
+    function renderTree(documentIr) {
+      const root = el("tree");
+      root.innerHTML = "";
+      const nodes = documentIr.nodes;
+      state.nodes = nodes;
+      state.original = rowSignatureSeed(nodes);
+      const marks = (state.filterMarks && state.filterMarks.length)
+        ? state.filterMarks
+        : filterValues(documentIr);
+      function add(list, id) {
+        const node = nodes[id];
+        if (!node) return;
+        const item = document.createElement("li");
+        item.dataset.kind = node.kind;
+        if (node.kind === "Comparison" || node.kind === "Between" || node.kind === "InList") {
+          renderComparison(item, node);
+        } else {
+          const [keyword, rest] = parts(node);
+          if (keyword) {
+            item.appendChild(chip(keyword, "kw"));
+            item.append(" ");
+          }
+          if (rest) {
+            const holder = document.createElement("span");
+            holder.className = "val";
+            paint(holder, rest, marks);
+            item.appendChild(holder);
+          }
+        }
+        if (node.editable) {
+          const badge = document.createElement("span");
+          badge.className = "editable";
+          badge.textContent = "editable";
+          item.appendChild(badge);
+        }
+        list.appendChild(item);
+        const children = node.children || [];
+        if (children.length) {
+          const nested = document.createElement("ul");
+          item.appendChild(nested);
+          for (const child of children) add(nested, child);
+        }
+      }
+      add(root, documentIr.rootId);
+      renderFilters(documentIr);
+    }
+
+    /* ---- Dynamic filter panel ---- */
+
+    const PATCH_OP = {
+      Comparison: "set_comparison",
+      Between: "set_between",
+      InList: "set_in_list",
+      Limit: "set_limit",
+    };
+    const KNOWN_CHOICES = { status: ["paid", "refunded", "open"] };
+    const CLAUSE_ORDER = ["Where", "Having", "Qualify", "Join", "Limit"];
+
+    function collectFilters(documentIr) {
+      const nodes = documentIr.nodes;
+      const groups = [];
+      function walk(id, scope, clause) {
+        const node = nodes[id];
+        if (!node) return;
+        if (node.kind === "Select") {
+          walkChildren(node, scope || "root", clause);
+          return;
+        }
+        walkChildren(node, scope, clause);
+      }
+      function walkChildren(node, scope, clause) {
+        for (const childId of node.children || []) {
+          const child = nodes[childId];
+          if (!child) continue;
+          if (child.kind === "CTE") {
+            walk(childId, child.name || "cte", null);
+            continue;
+          }
+          if (child.kind === "Select") {
+            walk(childId, scope, clause);
+            continue;
+          }
+          if (child.kind === "Join") {
+            const table = child.table || "";
+            walkChildren(child, scope, table ? `join ${table}` : "join");
+            continue;
+          }
+          if (child.kind === "Limit") {
+            addRow(groups, scope || "root", "limit", childId, child);
+            continue;
+          }
+          if (isClause(child.kind)) {
+            walkChildren(child, scope, child.kind.toLowerCase());
+            continue;
+          }
+          if (isLeafPredicate(child.kind) || child.editable) {
+            addRow(groups, scope || "root", clause || "select", childId, child);
+            continue;
+          }
+          walkChildren(child, scope, clause);
+        }
+      }
+      walk(documentIr.rootId, "root", null);
+      return groups;
+    }
+
+    function isClause(kind) {
+      return ["Where", "Having", "Qualify", "Group", "From"].includes(kind);
+    }
+
+    function isLeafPredicate(kind) {
+      return ["Comparison", "Between", "InList", "Exists", "Or", "And", "Is", "Like", "Not", "In", "Expr"].includes(kind);
+    }
+
+    function addRow(groups, scope, clause, id, node) {
+      const key = scope + "|" + clause;
+      let group = groups.find((item) => item.key === key);
+      if (!group) {
+        group = { key, scope, clause, rows: [] };
+        groups.push(group);
+      }
+      group.rows.push({ id, node });
+    }
+
+    const LABELS = {
+      cust_id: "Customer id",
+      status: "Status",
+      amount: "Amount",
+      region: "Region",
+      created_at: "Created at",
+      id: "Id",
+      email: "Email",
+    };
+
+    function humanize(column) {
+      if (!column) return "Value";
+      if (LABELS[column]) return LABELS[column];
+      const words = column.replace(/_id$/, "").split("_").filter(Boolean);
+      if (!words.length) return column;
+      const first = words[0].charAt(0).toUpperCase() + words[0].slice(1);
+      return [first, ...words.slice(1)].join(" ");
+    }
+
+    function describe(node) {
+      if (node.kind === "Limit") return "Row limit";
+      const left = node.left || {};
+      if (left.column !== undefined) return humanize(left.column);
+      if (left.expr !== undefined) return left.expr;
+      return node.kind;
+    }
+
+    function columnOf(node) {
+      const left = node.left || {};
+      return left.column !== undefined ? left.column : null;
+    }
+
+    function valueType(value) {
+      if (value === null || value === undefined) return "null";
+      if (typeof value === "boolean") return "boolean";
+      if (typeof value === "number") return "number";
+      if (typeof value === "object" && value.param !== undefined) return "param";
+      return "string";
+    }
+
+    function textOf(value) {
+      if (value === null || value === undefined) return "";
+      if (typeof value === "object" && value.param !== undefined) return markerText(value.param);
+      return String(value);
+    }
+
+    function parseInput(raw, type) {
+      if (type === "number") {
+        if (raw.trim() === "") return null;
+        const number = Number(raw);
+        return Number.isFinite(number) ? number : raw;
+      }
+      if (type === "boolean") return raw === "true";
+      if (type === "null") return raw === "" ? null : raw;
+      return raw;
+    }
+
+    function makeInput(row, type, value, ariaLabel) {
+      let field;
+      if (type === "boolean") {
+        field = document.createElement("select");
+        for (const option of ["true", "false"]) {
+          const node = document.createElement("option");
+          node.value = option;
+          node.textContent = option.toUpperCase();
+          field.appendChild(node);
+        }
+        field.value = value ? "true" : "false";
+      } else {
+        field = document.createElement("input");
+        field.type = type === "number" ? "number" : "text";
+        field.autocomplete = "off";
+        field.value = textOf(value);
+      }
+      field.dataset.role = row;
+      field.setAttribute("aria-label", ariaLabel);
+      field.addEventListener("input", markDirty);
+      field.addEventListener("change", markDirty);
+      field.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          preview();
+        }
+      });
+      return field;
+    }
+
+    function readOnlyText(node) {
+      if (node.text) return node.text;
+      const left = node.left || {};
+      const name = left.column !== undefined ? left.column : (left.expr || "");
+      const right = node.right && node.right.value;
+      if (node.kind === "Comparison") {
+        if (right && right.expr !== undefined) return name + " " + node.op + " " + right.expr;
+        if (right && right.param !== undefined) return name + " " + node.op + " " + markerText(right.param);
+        return name + " " + node.op + " " + literal(right);
+      }
+      if (node.kind === "Between") return name + " BETWEEN " + literal(node.low) + " AND " + literal(node.high);
+      if (node.kind === "InList") return name + " IN (" + (node.values || []).map(literal).join(", ") + ")";
+      return name || node.kind;
+    }
+
+    function paramsFromNode(node) {
+      if (node.kind === "Comparison") return { value: node.right ? node.right.value : null };
+      if (node.kind === "Between") return { low: node.low, high: node.high };
+      if (node.kind === "InList") return { values: node.values || [] };
+      if (node.kind === "Limit") return { value: node.value };
+      return {};
+    }
+
+    function makeRow(item, index) {
+      const node = item.node;
+      const wrapper = document.createElement("div");
+      wrapper.className = "filter-row";
+      wrapper.dataset.nodeId = item.id;
+      wrapper.dataset.kind = node.kind;
+      const line = document.createElement("div");
+      line.className = "label-line";
+      const label = document.createElement("strong");
+      label.textContent = describe(node);
+      line.appendChild(label);
+      const kindLabel = document.createElement("span");
+      kindLabel.className = "meta";
+      kindLabel.textContent = node.kind === "Comparison" ? (node.op || "=") : "";
+      line.appendChild(kindLabel);
+      wrapper.appendChild(line);
+      const meta = document.createElement("p");
+      meta.className = "meta";
+      wrapper.appendChild(meta);
+
+      if (!node.editable) {
+        wrapper.classList.add("readonly");
+        meta.textContent = "structure, read-only";
+        const sql = document.createElement("span");
+        sql.className = "ro-sql";
+        paint(sql, readOnlyText(node), state.filterMarks);
+        wrapper.appendChild(sql);
+        wrapper.dataset.original = "";
+        wrapper.dataset.order = String(index);
+        return wrapper;
+      }
+
+      if (node.kind === "Comparison") {
+        const type = valueType(node.right ? node.right.value : null);
+        meta.textContent = "left: " + (columnOf(node) || "expr") + " (read-only)    op: " + (node.op || "=") + " (read-only)    value: " + type;
+        const choices = KNOWN_CHOICES[columnOf(node)];
+        if (type === "string" && choices) {
+          const field = document.createElement("select");
+          for (const option of choices) {
+            const entry = document.createElement("option");
+            entry.value = option;
+            entry.textContent = option;
+            field.appendChild(entry);
+          }
+          const current = textOf(node.right.value).replace(/^'|'$/g, "");
+          field.value = choices.includes(current) ? current : choices[0];
+          field.dataset.role = "value";
+          field.setAttribute("aria-label", describe(node));
+          field.addEventListener("change", markDirty);
+          wrapper.appendChild(field);
+        } else {
+          wrapper.appendChild(makeInput("value", type, node.right ? node.right.value : null, describe(node)));
+        }
+        wrapper.dataset.type = type;
+        wrapper.dataset.original = JSON.stringify(paramsFromNode(node));
+      } else if (node.kind === "Between") {
+        meta.textContent = "left: " + (columnOf(node) || "expr") + " (read-only)    op: BETWEEN (read-only)";
+        const range = document.createElement("div");
+        range.className = "range";
+        const lowType = valueType(node.low);
+        range.append(
+          makeInput("low", lowType, node.low, describe(node) + " low"),
+          Object.assign(document.createElement("span"), { className: "meta", textContent: "and" }),
+          makeInput("high", valueType(node.high), node.high, describe(node) + " high"),
+        );
+        wrapper.appendChild(range);
+        wrapper.dataset.original = JSON.stringify(paramsFromNode(node));
+      } else if (node.kind === "InList") {
+        meta.textContent = "left: " + (columnOf(node) || "expr") + " (read-only)    op: IN (read-only)";
+        const members = document.createElement("div");
+        members.className = "members";
+        const type = (node.values || []).length ? valueType(node.values[0]) : "string";
+        (node.values || []).forEach((value) => members.appendChild(makeInput("member", type, value, describe(node) + " value")));
+        const add = document.createElement("button");
+        add.type = "button";
+        add.className = "small";
+        add.textContent = "Add value";
+        add.addEventListener("click", () => {
+          members.insertBefore(makeInput("member", type, "", describe(node) + " value"), add);
+          markDirty();
+        });
+        members.appendChild(add);
+        wrapper.appendChild(members);
+        wrapper.dataset.original = JSON.stringify(paramsFromNode(node));
+      } else if (node.kind === "Limit") {
+        meta.textContent = "cardinality change";
+        wrapper.appendChild(makeInput("value", "number", node.value, "Row limit"));
+        wrapper.dataset.original = JSON.stringify(paramsFromNode(node));
+      } else {
+        wrapper.classList.add("readonly");
+        meta.textContent = node.editable ? "" : "structure, read-only";
+        const sql = document.createElement("span");
+        sql.className = "ro-sql";
+        paint(sql, node.text || describe(node), state.filterMarks);        wrapper.appendChild(sql);
+        wrapper.dataset.original = "";
+      }
+      wrapper.dataset.order = String(index);
+      return wrapper;
+    }
+
+    function headingFor(group) {
+      const where = group.clause === "select" ? "filters" : group.clause;
+      return where + " · " + group.scope;
+    }
+
+    function renderFilters(documentIr) {
+      const shelf = el("filter-groups");
+      shelf.innerHTML = "";
+      const groups = collectFilters(documentIr);
+      let editableCount = 0;
+      for (const group of groups) {
+        const section = document.createElement("section");
+        section.className = "filter-group";
+        const heading = document.createElement("h3");
+        heading.textContent = headingFor(group);
+        section.appendChild(heading);
+        group.rows.forEach((item, index) => {
+          if (item.node.editable) editableCount += 1;
+          section.appendChild(makeRow(item, index));
+        });
+        shelf.appendChild(section);
+      }
+      el("no-lane").classList.toggle("hidden", editableCount > 0);
+      state.editableCount = editableCount;
+    }
+
+    function readRow(row, node) {
+      const fields = (role) => Array.from(row.querySelectorAll(`[data-role="${role}"]`));
+      if (node.kind === "Comparison") {
+        const field = fields("value")[0];
+        return { op: "set_comparison", params: { value: parseInput(field.value, row.dataset.type) } };
+      }
+      if (node.kind === "Between") {
+        const low = fields("low")[0];
+        const high = fields("high")[0];
+        return {
+          op: "set_between",
+          params: {
+            low: parseInput(low.value, valueType(node.low)),
+            high: parseInput(high.value, valueType(node.high)),
+          },
+        };
+      }
+      if (node.kind === "InList") {
+        const type = (node.values || []).length ? valueType(node.values[0]) : "string";
+        return { op: "set_in_list", params: { values: fields("member").map((field) => parseInput(field.value, type)) } };
+      }
+      const field = fields("value")[0];
+      return { op: "set_limit", params: { value: parseInput(field.value, "number") } };
+    }
+
+    function rowSignatures() {
+      return Array.from(el("filter-groups").querySelectorAll(".filter-row"))
+        .filter((row) => PATCH_OP[row.dataset.kind] && !row.classList.contains("readonly"))
+        .map((row) => {
+          const node = state.nodes[row.dataset.nodeId];
+          return row.dataset.nodeId + "=" + JSON.stringify(readRow(row, node).params);
+        });
+    }
+
+    function markReady(sql, marks) {
+      clearError();
+      el("empty").classList.add("hidden");
+      el("work").classList.remove("hidden");
+      el("result").classList.remove("hidden");
+      el("new-query").classList.remove("hidden");
+      setStatus("Ready", "ready");
+      el("sql-row").classList.remove("hidden");
+      el("before-label").textContent = "Before";
+      paint(el("before-sql"), sql, marks || []);
+      setAfter("(same until Preview)");
+      el("apply").disabled = true;
+      el("apply-hint").textContent = "Apply is disabled";
+      state.previewFingerprint = null;
+    }
+
+    function markDirty() {
+      if (!state.draftId || state.busy) return;
+      const now = rowSignatures();
+      if (now.join("|") === state.original.join("|")) return;
+      clearError();
+      setStatus("Unsaved value", "dirty");
+      el("apply").disabled = true;
+      el("apply-hint").textContent = "Apply is disabled until Preview is green";
+      state.previewFingerprint = null;
+    }
+
+    function lockDialect() {
+      state.parsed = true;
+      for (const input of document.querySelectorAll('input[name="dialect"]')) input.disabled = true;
+    }
+
+    function reset() {
+      state.draftId = null;
+      state.fingerprint = null;
+      state.previewFingerprint = null;
+      state.dialect = null;
+      state.nodes = {};
+      state.original = [];
+      state.editableCount = 0;
+      state.parsed = false;
+      state.filterMarks = [];
+      for (const input of document.querySelectorAll('input[name="dialect"]')) input.disabled = false;
+      setChip(null);
+      clearError();
+      el("tree").innerHTML = "";
+      el("filter-groups").innerHTML = "";
+      el("sql-input").value = "";
+      el("before-sql").textContent = "";
+      setAfter("(same until Preview)");
+      el("work").classList.add("hidden");
+      el("result").classList.add("hidden");
+      el("new-query").classList.add("hidden");
+      el("empty").classList.remove("hidden");
+      setStatus("Ready", "empty");
+      el("paste").open = false;
+      el("load-sample").focus();
+    }
+
+    async function loadDraft(sql, dialect) {
+      if (state.busy) return;
+      setBusy(true);
+      try {
+        const created = await api("/v1/queries", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ sql: sql, dialect: dialect }),
+        });
+        state.draftId = created.draft_id;
+        state.fingerprint = created.fingerprint;
+        state.dialect = created.dialect;
+        setChip(created.dialect);
+        lockDialect();
+        const view = await api("/v1/queries/" + created.draft_id + "/preview", {
+          method: "POST",
+          headers: headers(),
+          body: "{}",
+        });
+        state.filterMarks = view.filter_values || [];
+        const tree = await api("/v1/queries/" + created.draft_id + "/tree");
+        renderTree(tree);
+        markReady(view.before_sql, state.filterMarks);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function rowSignatureSeed(nodes) {
+      return Object.entries(nodes)
+        .filter(([, node]) => node.editable)
+        .map(([id, node]) => id + "=" + JSON.stringify(paramsFromNode(node)));
+    }
+
+    async function patch(nodeId, op, params) {
+      const updated = await api("/v1/queries/" + state.draftId + "/params", {
+        method: "PATCH",
+        headers: Object.assign({ "If-Match": state.fingerprint }, headers()),
+        body: JSON.stringify({ op: op, nodeId: nodeId, params: params }),
+      });
+      state.fingerprint = updated.fingerprint;
+    }
+
+    async function pushChangedRows() {
+      for (const row of Array.from(el("filter-groups").querySelectorAll(".filter-row"))) {
+        const kind = row.dataset.kind;
+        if (!PATCH_OP[kind] || row.classList.contains("readonly")) continue;
+        const node = state.nodes[row.dataset.nodeId];
+        if (!node) continue;
+        const payload = readRow(row, node);
+        if (JSON.stringify(payload.params) === row.dataset.original) continue;
+        await patch(row.dataset.nodeId, payload.op, payload.params);
+        row.dataset.original = JSON.stringify(payload.params);
+      }
+    }
+
+    async function preview() {
+      if (!state.draftId || state.busy) return;
+      setBusy(true);
+      try {
+        await pushChangedRows();
+        const view = await api("/v1/queries/" + state.draftId + "/preview", {
+          method: "POST",
+          headers: headers(),
+          body: "{}",
+        });
+        state.previewFingerprint = view.preview_fingerprint;
+        state.filterMarks = view.filter_values || [];
+        const tree = await api("/v1/queries/" + state.draftId + "/tree");
+        renderTree(tree);
+        paint(el("before-sql"), view.before_sql, state.filterMarks);
+        el("result").classList.remove("hidden");
+        const marks = state.filterMarks.length ? state.filterMarks : filterValues(tree);
+        if (view.blocked) {
+          setAfter(view.after_sql, marks);
+          showError({ phase: "preview", code: (view.blocked_reasons || []).join(", ") || "BLOCKED",
+            track_id: "", message: (view.blocked_reasons || []).join(", ") });
+          return;
+        }
+        clearError();
+        if (view.collapsed) {
+          setStatus("Ready", "ready");
+          setAfter("(same until Preview)");
+          el("apply").disabled = true;
+          el("apply-hint").textContent = "Apply is disabled";
+          return;
+        }
+        setStatus("Ready to apply", "green");
+        setAfter(view.after_sql, marks);
+        el("apply").disabled = false;
+        el("apply-hint").textContent = "Apply is enabled";
+      } catch (error) {
+        showError(error.body || { message: error.message });
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function apply() {
+      if (!state.previewFingerprint || state.busy) return;
+      setBusy(true);
+      try {
+        const applied = await api("/v1/queries/" + state.draftId + "/apply", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ preview_fingerprint: state.previewFingerprint }),
+        });
+        state.draftId = applied.draft_id;
+        state.fingerprint = applied.fingerprint;
+        state.previewFingerprint = null;
+        const view = await api("/v1/queries/" + applied.draft_id + "/preview", {
+          method: "POST",
+          headers: headers(),
+          body: "{}",
+        });
+        state.filterMarks = view.filter_values || [];
+        const tree = await api("/v1/queries/" + applied.draft_id + "/tree");
+        renderTree(tree);
+        clearError();
+        setStatus("Applied", "applied");
+        el("before-label").textContent = "Before";
+        el("sql-row").classList.remove("hidden");
+        paint(el("before-sql"), view.before_sql, state.filterMarks);
+        setAfter("(same until Preview)");
+        el("apply").disabled = true;
+        el("apply-hint").textContent = "Apply is disabled";
+      } catch (error) {
+        showError(error.body || { message: error.message });
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function loadExamples() {
+      try {
+        const body = await api("/v1/examples", { headers: headers() });
+        const shelf = el("examples");
+        for (const item of body.examples) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "example";
+          button.dataset.dialect = item.dialect;
+          button.dataset.exampleId = item.id;
+          const name = document.createElement("span");
+          name.className = "name";
+          name.textContent = item.title;
+          const tags = document.createElement("span");
+          tags.className = "tags";
+          const dialectTag = document.createElement("span");
+          dialectTag.className = "tag";
+          dialectTag.dataset.dialect = item.dialect;
+          dialectTag.textContent = item.dialect;
+          tags.appendChild(dialectTag);
+          for (const tag of item.tags || []) {
+            const chip = document.createElement("span");
+            chip.className = "tag";
+            chip.textContent = tag;
+            tags.appendChild(chip);
+          }
+          button.append(name, tags);
+          button.addEventListener("click", () => {
+            el("sql-input").value = item.sql;
+            const radio = document.querySelector('input[name="dialect"][value="' + item.dialect + '"]');
+            if (radio) radio.checked = true;
+            loadDraft(item.sql, item.dialect)
+              .catch((error) => showError(error.body || { message: error.message }));
+          });
+          shelf.appendChild(button);
+        }
+      } catch (error) {
+        el("examples").textContent = "Examples are not available.";
+      }
+    }
+
+    loadExamples();
+    el("load-sample").addEventListener("click", () => {
+      loadDraft(SAMPLE, "postgres").catch((error) => showError(error.body || { message: error.message }));
+    });
+    el("parse-sql").addEventListener("click", () => {
+      const dialect = document.querySelector('input[name="dialect"]:checked').value;
+      loadDraft(el("sql-input").value, dialect).catch((error) => showError(error.body || { message: error.message }));
+    });
+    el("preview").addEventListener("click", preview);
+    el("apply").addEventListener("click", apply);
+    el("new-query").addEventListener("click", reset);
+  </script>
+</body>
+</html>

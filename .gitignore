@@ -1,0 +1,11 @@
+.DS_Store
+target/
+*.whl
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.egg-info/
+.mypy_cache/
+dist/
+build/

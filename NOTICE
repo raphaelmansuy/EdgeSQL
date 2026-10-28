@@ -1,0 +1,52 @@
+EdgeSQL
+Copyright 2026 Raphael Mansuy
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full text.
+
+Contact and attribution
+-----------------------
+
+Author: Raphael Mansuy
+LinkedIn: https://www.linkedin.com/in/raphaelmansuy/
+Repository: https://github.com/raphaelmansuy/EdgeSQL
+
+Third-party components
+----------------------
+
+This product includes SQLGlot, used as the SQL parser and printer.
+
+  SQLGlot
+  Copyright 2023 Toby Mao
+  Licensed under the MIT License
+  https://github.com/tobymao/sqlglot
+
+The report helper example uses FastAPI, Starlette, Pydantic, Uvicorn, and
+HTTPX. Each project keeps its own licence.
+
+  FastAPI: MIT, https://github.com/fastapi/fastapi
+  Starlette: BSD 3-Clause, https://github.com/encode/starlette
+  Pydantic: MIT, https://github.com/pydantic/pydantic
+  Uvicorn: BSD 3-Clause, https://github.com/encode/uvicorn
+  HTTPX: BSD 3-Clause, https://github.com/encode/httpx
+
+The test suite uses pytest and Playwright. Each project keeps its own licence.
+
+  pytest: MIT, https://github.com/pytest-dev/pytest
+  Playwright: Apache 2.0, https://github.com/microsoft/playwright
+
+The optional Postgres check uses pglast and libpg_query.
+
+  pglast: PostgreSQL licence, https://github.com/lelit/pglast
+  libpg_query: BSD 3-Clause, https://github.com/pganalyze/libpg_query
+
+The Postgres regression fixtures under tests/fixtures/postgres come from the
+PostgreSQL source tree and keep the PostgreSQL licence and copyright.
+
+  PostgreSQL: PostgreSQL licence, https://www.postgresql.org/about/licence/
+
+The Databricks examples under tests/fixtures/databricks and
+examples/report-helper/examples.json come from the Databricks SQL language
+manual and are used as reference cases.
+
+  Databricks documentation: https://docs.databricks.com/
