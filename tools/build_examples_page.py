@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from site_parts import AUTHOR, CTA, FOOTER, head
+from site_parts import AUTHOR, BOOK, CTA, FOOTER, PROJECTS, RECOGNITION, head
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "examples" / "report-helper" / "examples.json"
@@ -136,6 +136,12 @@ def build() -> str:
   </div>
 
 {AUTHOR}
+
+{RECOGNITION}
+
+{BOOK}
+
+{PROJECTS}
 
 {CTA}
 

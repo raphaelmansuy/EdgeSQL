@@ -91,6 +91,69 @@ def test_publishing_guide_exists():
         assert step in text
 
 
+def test_readme_documents_pypi_and_uv():
+    readme = (ROOT / "README.md").read_text()
+    assert "pip install edgesql" in readme
+    assert "uv add edgesql" in readme
+    assert "uv pip install edgesql" in readme
+    assert "https://pypi.org/project/edgesql/" in readme
+
+
+def test_readme_links_the_other_projects():
+    readme = (ROOT / "README.md").read_text()
+    for url in (
+        "https://edgequake.com/",
+        "https://www.edgecrab.com/",
+        "https://edgewhisper.com/",
+        "https://www.oreilly.com/library/view/the-definitive-guide/9781837631919/",
+        "https://www.favikon.com/blog/top-ai-experts-france",
+    ):
+        assert url in readme, url
+    for image in (
+        "docs/assets/projects/edgequake.jpg",
+        "docs/assets/projects/edgecrab.jpg",
+        "docs/assets/projects/edgewhisper.jpg",
+        "docs/assets/book/definitive-guide-data-integration.jpg",
+    ):
+        assert image in readme, image
+        assert (ROOT / image).exists(), image
+    assert "12" in readme
+    assert "7,012" in readme
+
+
+@pytest.mark.parametrize("page", ["index.html", "tutorial.html", "examples.html", "reference.html"])
+def test_site_links_the_other_projects(page):
+    text = (ROOT / "docs" / page).read_text()
+    for url in (
+        "https://edgequake.com/",
+        "https://www.edgecrab.com/",
+        "https://edgewhisper.com/",
+        "https://www.oreilly.com/library/view/the-definitive-guide/9781837631919/",
+        "https://www.favikon.com/blog/top-ai-experts-france",
+        "https://pypi.org/project/edgesql/",
+    ):
+        assert url in text, (page, url)
+    for image in (
+        "assets/projects/edgequake.jpg",
+        "assets/projects/edgecrab.jpg",
+        "assets/projects/edgewhisper.jpg",
+        "assets/book/definitive-guide-data-integration.jpg",
+    ):
+        assert image in text, (page, image)
+
+
+def test_project_and_book_images_are_real():
+    for name in (
+        "docs/assets/projects/edgequake.jpg",
+        "docs/assets/projects/edgecrab.jpg",
+        "docs/assets/projects/edgewhisper.jpg",
+        "docs/assets/book/definitive-guide-data-integration.jpg",
+    ):
+        path = ROOT / name
+        assert path.stat().st_size > 20_000, name
+        assert path.read_bytes()[:3] == b"\xff\xd8\xff", name
+
+
 @pytest.mark.parametrize("page", ["index.html", "tutorial.html", "examples.html", "reference.html"])
 def test_site_has_author_and_licence(page):
     text = (ROOT / "docs" / page).read_text()

@@ -1,4 +1,4 @@
-"""Fill the shared author, call to action, and footer blocks in docs/.
+"""Fill the shared author, recognition, book, projects, call to action, and footer blocks.
 
 Run after you change tools/site_parts.py or any page body:
 
@@ -13,16 +13,27 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_examples_page import build as build_examples
-from site_parts import AUTHOR, CTA, FOOTER
+from site_parts import AUTHOR, BOOK, CTA, FOOTER, PROJECTS, RECOGNITION
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 PAGES = ["index.html", "tutorial.html", "reference.html"]
 
+BLOCKS = {
+    "<!-- AUTHOR -->": AUTHOR,
+    "<!-- RECOGNITION -->": RECOGNITION,
+    "<!-- BOOK -->": BOOK,
+    "<!-- PROJECTS -->": PROJECTS,
+    "<!-- CTA -->": CTA,
+    "<!-- FOOTER -->": FOOTER,
+}
+
 
 def fill(path: Path) -> bool:
     text = path.read_text()
-    updated = text.replace("<!-- AUTHOR -->", AUTHOR).replace("<!-- CTA -->", CTA).replace("<!-- FOOTER -->", FOOTER)
+    updated = text
+    for marker, block in BLOCKS.items():
+        updated = updated.replace(marker, block)
     if updated != text:
         path.write_text(updated)
         return True

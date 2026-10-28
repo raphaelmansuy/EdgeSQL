@@ -16,6 +16,7 @@ dynamic filter screen from any query.
 
 Supported dialects: `postgres` and `databricks`.
 
+- PyPI: <https://pypi.org/project/edgesql/>
 - Documentation and tutorial: <https://raphaelmansuy.github.io/EdgeSQL/>
 - Example app: `examples/report-helper` (FastAPI and native HTML)
 - Licence: Apache 2.0
@@ -40,21 +41,54 @@ print(query.to_sql())
 
 ## Install
 
+From PyPI with pip:
+
 ```bash
 pip install edgesql
 ```
 
-From the repository, for development:
+With `uv`, which resolves and installs in one step:
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
+uv add edgesql            # add it to a project
+uv pip install edgesql    # or install into the active environment
+```
+
+To run it once without installing it:
+
+```bash
+uvx --from edgesql python -c "from edgesql import Query; print(Query.parse('SELECT 1', dialect='postgres').to_sql())"
+```
+
+Check the install:
+
+```bash
+python -c "import edgesql, importlib.metadata as m; print(m.version('edgesql'))"
 ```
 
 To add the optional Postgres check with `pglast`:
 
 ```bash
-pip install "edgesql[postgres]"
+pip install "edgesql[postgres]"      # or: uv add "edgesql[postgres]"
+```
+
+## Install from the repository
+
+For development, clone the repository and use the `dev` extra. It adds pytest,
+FastAPI, uvicorn, Playwright, and ruff.
+
+```bash
+git clone https://github.com/raphaelmansuy/EdgeSQL.git
+cd EdgeSQL
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+```
+
+With `uv`, the same step is:
+
+```bash
+uv venv
+uv pip install -e ".[dev]"
 ```
 
 ## The two ways to change a query
@@ -313,9 +347,12 @@ A transform that changes a recursive CTE projection is refused.
 
 <img src="docs/assets/raphael-mansuy.jpg" alt="Headshot of Raphael Mansuy, author of EdgeSQL." width="120" align="right">
 
-Raphael Mansuy builds data platforms and developer tools. He writes about SQL,
-data engineering, and practical software design, and he ships small libraries
-that solve one problem well.
+Raphael Mansuy is a data engineering and AI strategist with more than 20 years
+of global technology leadership experience. He works on democratizing data
+management and AI, and helps organizations build scalable data platforms. His
+work covers resilient data infrastructure, machine learning models, and coaching
+teams on practice. He leads a startup studio in Hong Kong and writes about AI
+and data strategy.
 
 EdgeSQL started from a simple observation: changing SQL with string replacement
 breaks as soon as two edits touch the same name. A typed tree with a preview gate
@@ -324,8 +361,66 @@ is the smallest honest fix.
 - LinkedIn: [linkedin.com/in/raphaelmansuy](https://www.linkedin.com/in/raphaelmansuy/)
 - Repository: [github.com/raphaelmansuy/EdgeSQL](https://github.com/raphaelmansuy/EdgeSQL)
 - Tutorial site: [raphaelmansuy.github.io/EdgeSQL](https://raphaelmansuy.github.io/EdgeSQL/)
+- PyPI: [pypi.org/project/edgesql](https://pypi.org/project/edgesql/)
 
 [Connect with Raphael on LinkedIn](https://www.linkedin.com/in/raphaelmansuy/).
+
+### Recognition
+
+Favikon ranks Raphael at **12** in [Top 20 AI Experts in France in
+2026](https://www.favikon.com/blog/top-ai-experts-france), with a Favikon
+Authority Score of 7,012 points. The list covers the most visible AI
+practitioners in France, and the entry cites his 20 years of data and AI
+leadership and his work on scalable data platforms.
+
+### Book
+
+<img src="docs/assets/book/definitive-guide-data-integration.jpg" alt="Cover of The Definitive Guide to Data Integration, with Raphael Mansuy as a co-author." width="150" align="right">
+
+[**The Definitive Guide to Data Integration**](https://www.oreilly.com/library/view/the-definitive-guide/9781837631919/)
+(Packt, 2024). Subtitle: *Unlock the power of data integration to efficiently
+manage, transform, and analyze data*. Raphael is a co-author with Pierre-Yves
+Bonnefoy, Emeric Chaize, Mehdi Tazi, and Stephane Heckel. The book is available
+through O'Reilly.
+
+### Other projects by Raphael
+
+<table>
+<tr>
+<td width="220"><img src="docs/assets/projects/edgequake.jpg" alt="EdgeQuake knowledge graph view: 200 nodes and 840 edges over an AI research corpus." width="200"></td>
+<td>
+
+**[EdgeQuake](https://edgequake.com/)** - Graph-RAG in Rust: one binary, one
+Postgres, any LLM. It reads PDFs and text, builds a knowledge graph in
+PostgreSQL, and answers questions with sources. Six retrieval modes: naive,
+local, global, hybrid, mix, and bypass. Apache 2.0.
+
+</td>
+</tr>
+<tr>
+<td><img src="docs/assets/projects/edgecrab.jpg" alt="EdgeCrab illustration: a comic battle between EdgeCrab and OpenClaw." width="200"></td>
+<td>
+
+**[EdgeCrab](https://www.edgecrab.com/)** - a personal and coding SuperAgent in
+one native Rust binary, with a ratatui terminal UI and a ReAct tool loop. It
+supports 24 LLM providers and 17 messaging gateways. Install with
+`npm install -g edgecrab-cli`, `pip install edgecrab-cli`, or
+`cargo install edgecrab-cli`.
+
+</td>
+</tr>
+<tr>
+<td><img src="docs/assets/projects/edgewhisper.jpg" alt="EdgeWhisper banner: voice dictation, on-device AI for macOS." width="200"></td>
+<td>
+
+**[EdgeWhisper](https://edgewhisper.com/)** - voice dictation for macOS, powered
+by Voxtral from Mistral AI. It runs fully on the device, with no cloud and no
+data collection. It supports 13 languages, an Apple Silicon Mac, and macOS 14
+or later.
+
+</td>
+</tr>
+</table>
 
 ## License
 
