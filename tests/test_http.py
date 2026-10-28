@@ -97,6 +97,26 @@ def test_read_only_predicate_is_a_422():
     assert denied.json()["code"] == "STRUCTURE_PATCH"
 
 
+def test_parse_error_body_carries_a_location():
+    client = _client()
+    headers = _session(client)
+    bad = client.post(
+        "/v1/queries",
+        headers=headers,
+        json={"sql": "SELECT cust_id FROM sales.orders WHERE status = ", "dialect": "postgres"},
+    )
+    assert bad.status_code == 422
+    body = bad.json()
+    assert body["code"] == "PARSE_FAILED"
+    location = body["location"]
+    assert location["line"] == 1
+    assert location["col"] == 47
+    assert location["text"] == "="
+    assert location["source_line"].startswith("SELECT cust_id")
+    assert "a value is missing after this comparison" in body["message"]
+    assert "Traceback" not in bad.text
+
+
 def test_health_and_csrf():
     client = _client()
     assert client.get("/healthz").json() == {"ok": True}

@@ -1,10 +1,24 @@
 # EdgeSQL
 
-EdgeSQL changes SQL on a typed tree. It reads a statement, resolves every
-column, and edits a copy of the tree. It prints the result in the same dialect.
-It does not use string replacement.
+**A Python library that parses Postgres and Databricks SQL, resolves every
+column, and edits a typed syntax tree. Preview before apply. No string
+replacement.**
 
-Supported dialects are `postgres` and `databricks`.
+EdgeSQL is a SQL parser, SQL rewriter, and query builder for Python. It reads a
+statement, resolves every column against its real table, and edits a copy of the
+syntax tree. It prints the result in the same dialect. It never edits SQL text
+with string replacement, so a rename cannot break a comment, a literal, or a
+second edit on the same name.
+
+Use EdgeSQL to rename a column safely, patch a filter value, change a range, a
+list, or a limit, rewrite a `WHERE` clause, add or drop a CTE, and build a
+dynamic filter screen from any query.
+
+Supported dialects: `postgres` and `databricks`.
+
+- Documentation and tutorial: <https://raphaelmansuy.github.io/EdgeSQL/>
+- Example app: `examples/report-helper` (FastAPI and native HTML)
+- Licence: Apache 2.0
 
 ```python
 from edgesql import Query
@@ -13,6 +27,16 @@ query = Query.parse("SELECT cust_id FROM sales.orders WHERE cust_id = 42", diale
 print(query.to_sql())
 # SELECT cust_id FROM sales.orders WHERE cust_id = 42
 ```
+
+## Why not string replacement
+
+| Task | String replacement | EdgeSQL |
+| --- | --- | --- |
+| Rename `cust_id` | Changes comments and literals too | Changes only the resolved column |
+| Know the owner table | Guess from the text | Reports the physical table and the CTE hops |
+| Two edits on one name | The second edit corrupts the first | Each edit runs on a copy of the tree |
+| Check the result | Read the diff by eye | Preview blocks a change that cannot reparse |
+| Change a filter value | Build a new SQL string | Patches one node and keeps the operator |
 
 ## Install
 
@@ -211,8 +235,7 @@ make dev      # http://127.0.0.1:8765
 ## Development
 
 ```bash
-make install       # virtual environment, library, dev tools, Chromium
-make dev           # serve the report helper
+make install       # virtual environment, library, dev tools, Chromiummake dev           # serve the report helper
 make site          # serve the tutorial site
 make check         # lint, formatting, and every test
 make test          # the whole suite
@@ -234,20 +257,8 @@ site, and the browser flow. Screenshots are in
 
 ## Publishing
 
-The package builds and validates with `make release-check`. Releases go to PyPI
-from the `Publish to PyPI` workflow when you publish a GitHub release. See
-[docs/PUBLISHING.md](docs/PUBLISHING.md) for the one time setup and the release
-steps.
+The package builds and validates with `make release-check`.
 
-## Tutorial
-
-A step by step tutorial and the full example gallery are in
-[docs/index.html](docs/index.html). Serve it locally with `make site`.
-
-## Add a publication to the library to pypi
-
-Package metadata lives in [pyproject.toml](pyproject.toml). The build includes
-the package, `py.typed`, and the licence files.
 ```bash
 make release-check   # build the sdist and the wheel, then check the metadata
 make publish-test    # upload to TestPyPI
@@ -257,6 +268,46 @@ make publish         # upload to PyPI
 CI publishes from [.github/workflows/publish.yml](.github/workflows/publish.yml)
 when you publish a GitHub release. Setup and the release checklist are in
 [docs/PUBLISHING.md](docs/PUBLISHING.md).
+
+## Tutorial
+
+A step by step tutorial, the full example gallery, and the API reference are on
+the published site: <https://raphaelmansuy.github.io/EdgeSQL/>. The source is in
+[docs/](docs/index.html). Serve it locally with `make site`.
+
+## Questions
+
+**Can EdgeSQL rename a column without touching comments or string literals?**
+Yes. The rename resolves the column to its table and edits only that column. A
+comment that contains the old name keeps its text.
+
+**Does it support CTEs, subqueries, and Recursive CTEs?**
+Yes. It resolves CTEs, derived tables, set operations, recursive CTEs, `LATERAL`
+sources, and correlated subqueries. A filter reports the CTE hops on the path to
+the physical table.
+
+**Can it change a filter value without rewriting the SQL string?**
+Yes. `set_params` replaces the right-hand value of one node and keeps the column,
+the operator, and the structure.
+
+**Does it work with Databricks and Postgres?**
+Yes. Both dialects are supported. `QUALIFY`, `SEMI`, and `ANTI` joins are
+Databricks only. `DISTINCT ON` and `FETCH` are Postgres only. A cross-dialect
+emit raises `CROSS_DIALECT` rather than printing a quiet substitute.
+
+**Does it connect to a database?**
+No. EdgeSQL reads and writes SQL text. It does not run a query and does not need
+a connection. Pass `schema` to disambiguate a column when a statement joins two
+tables.
+
+**Can a web form change a query safely?**
+Yes. The report helper builds its filter panel from the product IR, so any query
+gets controls that match its predicates. A change that cannot reparse is blocked,
+and Apply stays disabled until a clean preview exists.
+
+**What are the limits?**
+`inline_cte` and `rewrite` are not in v1, and `migrate` returns a blocked preview.
+A transform that changes a recursive CTE projection is refused.
 
 ## Author
 

@@ -14,11 +14,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from site_parts import AUTHOR, CTA, FOOTER
+from site_parts import AUTHOR, CTA, FOOTER, head
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "examples" / "report-helper" / "examples.json"
 TARGET = ROOT / "docs" / "examples.html"
+
+TITLE = "EdgeSQL examples - joins, subqueries, CTEs, and recursive CTEs"
+SUMMARY = "33 SQL examples in Postgres and Databricks that EdgeSQL parses, resolves, and projects to a product IR."
 
 
 def card(item: dict) -> str:
@@ -52,8 +55,8 @@ def build() -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>EdgeSQL examples - joins, subqueries, CTEs, and more</title>
-<meta name="description" content="{total} EdgeSQL examples in Postgres and Databricks: joins, subqueries, CTEs, recursive CTEs, QUALIFY, parameters, and limits.">
+<title>{TITLE}</title>
+{head(TITLE, "examples.html", SUMMARY)}
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>

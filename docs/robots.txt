@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://raphaelmansuy.github.io/EdgeSQL/sitemap.xml

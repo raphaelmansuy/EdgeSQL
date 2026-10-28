@@ -314,12 +314,110 @@ def test_every_catalog_code():
     assert _code(lambda: select("t").to_sql()).code == "UNKNOWN_DIALECT"
 
 
+def test_preview_reparse_keeps_the_span():
+    query = Query.parse("SELECT 1 AS a", dialect="postgres")
+
+    def _break(current):
+        nxt = current.limit(1)
+        nxt.to_sql = lambda *args, **kwargs: "SELECT FROM WHERE"
+        return nxt
+
+    preview = query.preview(_break)
+    assert any(reason.startswith("REPARSE_FAILED") for reason in preview.blocked_reasons)
+    assert preview.location is not None
+    assert preview.location["line"] >= 1
+    assert "source_line" in preview.location
+
+
 def test_error_display_shape():
-    error = _code(lambda: Query.parse("", dialect="postgres"))
+    error = _code(lambda: Query.parse("            ", dialect="postgres"))
     assert error.display() == "[parse/EMPTY_SQL] The SQL text is empty. Hint: Pass a non-empty statement."
     body = error.to_body()
     assert body["hint"] == "Pass a non-empty statement."
     assert "line" not in body
+    assert "location" not in body
+
+
+def test_syntax_error_carries_a_span():
+    sql = "SELECT cust_id FROM sales.orders WHERE status = "
+    error = _code(lambda: Query.parse(sql, dialect="postgres"))
+    assert error.code == "PARSE_FAILED"
+    span = error.span
+    assert span is not None
+    assert (span.line, span.col) == (1, 47)
+    assert span.text == "="
+    assert span.source_line == sql.rstrip() or span.source_line == sql
+    # The caret sits under the failing token.
+    assert span.caret() == " " * 46 + "^"
+    assert error.end_line == 1 and error.end_col == 48
+    assert "at line 1, column 47." in error.display()
+    assert "a value is missing after this comparison" in error.message
+    location = error.to_body()["location"]
+    assert location["line"] == 1
+    assert location["col"] == 47
+    assert location["text"] == "="
+    assert location["source_line"].startswith("SELECT cust_id")
+
+    explained = error.explain().splitlines()
+    assert explained[0] == error.display()
+    assert explained[1] == ""
+    assert explained[2].strip() == sql.strip()
+    assert explained[3].strip() == "^"
+
+
+def test_syntax_error_span_on_a_later_line():
+    sql = "SELECT cust_id,\n       status\nFROM sales.orders\nWHERE status =\n"
+    span = _code(lambda: Query.parse(sql, dialect="postgres")).span
+    assert span is not None
+    assert span.line == 4
+    assert span.text == "="
+    assert span.source_line == "WHERE status ="
+
+
+def test_highlight_covers_a_phrase():
+    sql = "SELECT * FROM sales.orders WHERE cust_id = 42 AND ORDER BY cust_id"
+    span = _code(lambda: Query.parse(sql, dialect="postgres")).span
+    assert span is not None
+    assert span.text == "ORDER BY"
+    assert span.width == len("ORDER BY")
+
+
+def test_unclosed_quote_names_the_delimiter():
+    error = _code(lambda: Query.parse("SELECT 'oops FROM t", dialect="postgres"))
+    assert error.code == "PARSE_FAILED"
+    assert "single quote" in error.message
+    assert "never closed" in error.message
+    assert error.span is not None
+    assert error.span.col == 8
+    assert error.span.text == "'"
+
+    double = _code(lambda: Query.parse('SELECT "oops FROM t', dialect="postgres"))
+    assert "double quote" in double.message
+
+    comment = _code(lambda: Query.parse("SELECT /* unclosed FROM t", dialect="postgres"))
+    assert "block comment" in comment.message
+    assert comment.span is not None
+    assert comment.span.text == "/*"
+
+
+def test_span_helpers_are_stable():
+    from edgesql.locate import span_at, span_from_offsets, span_from_parse_error
+
+    sql = "SELECT a\nFROM t"
+    at = span_at(sql, 2, 1, width=4)
+    assert at is not None
+    assert (at.line, at.col, at.end_col, at.text) == (2, 1, 5, "FROM")
+
+    offsets = span_from_offsets(sql, 9, 13)
+    assert offsets is not None
+    assert (offsets.line, offsets.col, offsets.text) == (2, 1, "FROM")
+
+    parsed = span_from_parse_error(sql, {"line": 2, "col": 1, "highlight": "FROM"})
+    assert parsed is not None
+    assert (parsed.line, parsed.col, parsed.text) == (2, 1, "FROM")
+
+    assert span_from_offsets(sql, None, None) is None
+    assert span_from_parse_error(sql, {}) is not None
 
 
 def test_max_recursion_round_trip():

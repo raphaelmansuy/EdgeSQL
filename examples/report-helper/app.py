@@ -204,6 +204,7 @@ def preview_query(
         "preview_fingerprint": view.fingerprint,
         "collapsed": view.collapsed,
         "filter_values": _filter_values(draft.current),
+        "location": view.location,
     }
 
 

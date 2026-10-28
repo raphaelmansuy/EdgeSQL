@@ -317,6 +317,41 @@ def _editable_count(page):
     return page.locator(".filter-row:not(.readonly)").count()
 
 
+def test_syntax_error_shows_the_caret(base_url):
+    from playwright.sync_api import sync_playwright
+
+    bad = "SELECT cust_id FROM sales.orders WHERE status = "
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        _open(page, base_url)
+        page.click("#paste")
+        page.fill("#sql-input", bad)
+        page.click("#parse-sql")
+        page.wait_for_selector("text=PARSE_FAILED")
+        assert page.locator("#err-where").inner_text() == "line 1, column 47"
+        assert page.locator("#err-text").inner_text() == "="
+        source = page.locator("#err-source").inner_text()
+        caret = page.locator("#err-caret").inner_text()
+        assert "status =" in source
+        assert caret.strip() == "^"
+        assert source.index("=") == caret.index("^")
+        assert "a value is missing after this comparison" in page.locator("#err-message").inner_text()
+        _shot(page, "21-syntax-error-caret.png")
+
+        page.click("#new-query")
+        page.click("#paste")
+        page.fill("#sql-input", "SELECT 'oops FROM t")
+        page.click("#parse-sql")
+        page.wait_for_selector("text=single quote")
+        assert "never closed" in page.locator("#err-message").inner_text()
+        assert page.locator("#err-where").inner_text() == "line 1, column 8"
+        assert page.locator("#err-text").inner_text() == "'"
+        assert page.locator("#err-caret").inner_text().strip() == "^"
+        _shot(page, "22-unclosed-quote.png")
+        browser.close()
+
+
 def test_dynamic_panel_matches_the_ir(base_url):
     from playwright.sync_api import sync_playwright
 

@@ -1,5 +1,6 @@
 """Packaging, licence, and attribution. A release must not miss these."""
 
+import json
 import re
 import tomllib
 from pathlib import Path
@@ -97,6 +98,42 @@ def test_site_has_author_and_licence(page):
     assert LINKEDIN in text
     assert "Apache License, Version 2.0" in text
     assert 'class="cta-band"' in text
+
+
+@pytest.mark.parametrize("page", ["index.html", "tutorial.html", "examples.html", "reference.html"])
+def test_page_has_search_metadata(page):
+    text = (ROOT / "docs" / page).read_text()
+    assert 'name="description"' in text
+    assert 'name="author" content="Raphael Mansuy"' in text
+    assert 'name="keywords"' in text
+    assert 'rel="canonical" href="https://raphaelmansuy.github.io/EdgeSQL/' in text
+    assert 'property="og:title"' in text
+    assert 'property="og:image"' in text
+    assert 'name="twitter:card"' in text
+    assert "application/ld+json" in text
+    # One canonical and one description per page.
+    assert text.count('rel="canonical"') == 1
+    assert text.count('name="description"') == 1
+
+
+def test_structured_data_is_valid_json():
+    text = (ROOT / "docs" / "index.html").read_text()
+    match = re.search(r'<script type="application/ld\+json">(.*?)</script>', text, re.DOTALL)
+    assert match
+    data = json.loads(match.group(1))
+    kinds = {node["@type"] for node in data["@graph"]}
+    assert {"SoftwareSourceCode", "Person"} <= kinds
+    software = next(node for node in data["@graph"] if node["@type"] == "SoftwareSourceCode")
+    assert software["license"] == "https://www.apache.org/licenses/LICENSE-2.0"
+    assert software["author"]["url"] == LINKEDIN
+
+
+def test_sitemap_and_robots():
+    sitemap = (ROOT / "docs" / "sitemap.xml").read_text()
+    robots = (ROOT / "docs" / "robots.txt").read_text()
+    for path in ("", "tutorial.html", "examples.html", "reference.html"):
+        assert f"https://raphaelmansuy.github.io/EdgeSQL/{path}" in sitemap
+    assert "Sitemap: https://raphaelmansuy.github.io/EdgeSQL/sitemap.xml" in robots
 
 
 def test_author_photo_is_published():

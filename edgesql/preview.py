@@ -52,6 +52,7 @@ class Preview:
     _before: object
     _after: object
     _before_canonical: str
+    location: dict | None = None
     last_audit: AuditRecord | None = field(default=None)
 
     @property
@@ -102,9 +103,10 @@ def build_preview(before, fn):
     before_canonical = before.to_sql(pretty=False)
     after_canonical = after.to_sql(pretty=False)
     reasons: list[str] = []
+    location = None
     if getattr(after, "_zero_hit", False):
         reasons.append("NO_MATCH")
-    _reparse(after, after_pretty, reasons)
+    location = _reparse(after, after_pretty, reasons)
     if _tables_must_hold(after) and list(before.tables()) != list(after.tables()):
         reasons.append("TABLE_SET_CHANGED")
     if before._mode == "agent" and not _allowed_statement(after._tree):
@@ -122,6 +124,7 @@ def build_preview(before, fn):
         _before=before,
         _after=after,
         _before_canonical=before_canonical,
+        location=location,
     )
 
 
@@ -143,15 +146,18 @@ def blocked_preview(query, reasons: list[str], ops: list[str] | None = None) -> 
     )
 
 
-def _reparse(after, sql: str, reasons: list[str]) -> None:
+def _reparse(after, sql: str, reasons: list[str]) -> dict | None:
+    """Parse the emitted SQL again. A miss blocks the preview and keeps its span."""
     from edgesql import Query
 
     try:
         Query.parse(sql, dialect=after._dialect, schema=after._schema, mode=after._mode or "library")
     except SqlCraftError as exc:
         reasons.append(f"REPARSE_FAILED {exc.code}")
+        return exc.span.to_body() if exc.span is not None else None
     except Exception:  # noqa: BLE001 - the parser is third-party; any miss blocks the preview
         reasons.append("REPARSE_FAILED PARSE_FAILED")
+    return None
 
 
 def _tables_must_hold(query) -> bool:

@@ -265,6 +265,26 @@
     #error dt { font-size: 14px; color: var(--quiet); }
     #error dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
     #error .message { font-family: inherit; font-size: 16px; }
+    #error .snippet {
+      display: grid;
+      gap: 0;
+      background: var(--sunken);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 8px 12px;
+      overflow-x: auto;
+    }
+    #error .snippet pre {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre;
+    }
+    #error .snippet .caret { color: #8a1f1f; font-weight: 700; }
+    #error dd#err-where { color: var(--ink); }
 
     .divider {
       display: flex;
@@ -440,8 +460,14 @@
           <dt>phase</dt><dd id="err-phase"></dd>
           <dt>code</dt><dd id="err-code"></dd>
           <dt>track</dt><dd id="err-track"></dd>
+          <dt id="err-where-label" class="hidden">at</dt><dd id="err-where"></dd>
+          <dt id="err-text-label" class="hidden">flagged</dt><dd id="err-text"></dd>
         </dl>
         <p class="message" id="err-message"></p>
+        <div id="err-snippet" class="snippet hidden">
+          <pre id="err-source"></pre>
+          <pre id="err-caret" class="caret" aria-hidden="true"></pre>
+        </div>
         <p class="meta" id="err-hint"></p>
       </div>
       <div class="sql-row" id="sql-row">
@@ -526,6 +552,7 @@
       el("err-message").textContent = body.message || "";
       el("err-hint").textContent = body.hint || "";
       el("err-hint").classList.toggle("hidden", !body.hint);
+      showLocation(body.location);
       const region = el("error");
       region.classList.remove("hidden");
       setStatus("Blocked", "blocked");
@@ -535,6 +562,32 @@
       el("new-query").classList.remove("hidden");
       el("sql-row").classList.toggle("hidden", !state.draftId);
       region.focus();
+    }
+
+    function showLocation(location) {
+      const hasSpan = Boolean(location && location.source_line);
+      for (const id of ["err-where-label", "err-where", "err-text-label", "err-text"]) {
+        el(id).classList.toggle("hidden", !hasSpan);
+      }
+      el("err-snippet").classList.toggle("hidden", !hasSpan);
+      if (!hasSpan) {
+        el("err-where").textContent = "";
+        el("err-text").textContent = "";
+        el("err-source").textContent = "";
+        el("err-caret").textContent = "";
+        return;
+      }
+      const start = location.col || 1;
+      const endLine = location.end_line || location.line;
+      const end = location.end_col || start + 1;
+      el("err-where").textContent =
+        endLine !== location.line
+          ? "line " + location.line + ", column " + start + " to line " + endLine + ", column " + end
+          : "line " + location.line + ", column " + start;
+      const flagged = location.text || "";
+      el("err-text").textContent = flagged.trim() ? flagged : "(whitespace)";
+      el("err-source").textContent = "  " + location.source_line;
+      el("err-caret").textContent = "  " + " ".repeat(Math.max(0, start - 1)) + "^".repeat(Math.max(1, end - start));
     }
 
     function clearError() {
@@ -1227,8 +1280,14 @@
         const marks = state.filterMarks.length ? state.filterMarks : filterValues(tree);
         if (view.blocked) {
           setAfter(view.after_sql, marks);
-          showError({ phase: "preview", code: (view.blocked_reasons || []).join(", ") || "BLOCKED",
-            track_id: "", message: (view.blocked_reasons || []).join(", ") });
+          showError({
+            phase: "preview",
+            code: (view.blocked_reasons || []).join(", ") || "BLOCKED",
+            track_id: "",
+            message: (view.blocked_reasons || []).join(", "),
+            hint: "",
+            location: view.location || null,
+          });
           return;
         }
         clearError();
