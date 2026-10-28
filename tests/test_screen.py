@@ -57,7 +57,15 @@ def base_url():
 
 
 def _shot(page, name: str) -> None:
+    """Save one screenshot. Error states carry a random track id, so mask it."""
     SHOTS.mkdir(parents=True, exist_ok=True)
+    page.evaluate(
+        """() => {
+          for (const node of document.querySelectorAll('[id="err-track"]')) {
+            node.textContent = node.textContent ? '0123456789ab' : '';
+          }
+        }"""
+    )
     page.screenshot(path=str(SHOTS / name), full_page=True)
 
 
