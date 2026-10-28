@@ -1,5 +1,9 @@
 # EdgeSQL
 
+[![PyPI](https://img.shields.io/pypi/v/edgesql.svg?label=PyPI)](https://pypi.org/project/edgesql/)
+[![Python](https://img.shields.io/pypi/pyversions/edgesql.svg)](https://pypi.org/project/edgesql/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 **A Python library that parses Postgres and Databricks SQL, resolves every
 column, and edits a typed syntax tree. Preview before apply. No string
 replacement.**
@@ -151,7 +155,7 @@ The output name stays `cust_id`. Set `keep_output_names=False` to change it.
 
 `preview()` computes these fields:
 
-| Field | Meaning |
+| File | Meaning |
 | --- | --- |
 | `before_sql` | Pretty SQL of the original |
 | `after_sql` | Pretty SQL of the result |

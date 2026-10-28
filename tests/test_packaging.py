@@ -79,6 +79,8 @@ def test_workflows_exist():
     assert "pypa/gh-action-pypi-publish" in publish
     assert "id-token: write" in publish
     assert "twine check" in publish
+    # The upload job stays off until a trusted publisher and a new version exist.
+    assert "vars.PUBLISH_ENABLED == 'true'" in publish
     assert "upload-pages-artifact" in pages
     assert "path: docs" in pages
 

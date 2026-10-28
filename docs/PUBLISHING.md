@@ -4,12 +4,15 @@ This note lists the steps to publish a release. Do them in order.
 
 ## One time setup
 
-1. Create the PyPI project. Register a trusted publisher for
-   `raphaelmansuy/EdgeSQL`, workflow `publish.yml`, environment `pypi`.
-   Do the same on TestPyPI if you want a rehearsal.
+1. Register a trusted publisher on PyPI for `raphaelmansuy/EdgeSQL`, workflow
+   `publish.yml`, environment `pypi`. Register the same on TestPyPI if you want
+   a rehearsal.
 2. In the GitHub repository, open Settings, Environments, and create an
    environment named `pypi`. Add a required reviewer if you want a manual gate.
-3. In Settings, Pages, set the source to **GitHub Actions**. The
+3. In Settings, Variables, add a repository variable `PUBLISH_ENABLED` with the
+   value `true`. The upload job is off until this variable exists, because PyPI
+   refuses a second upload of a version that is already published.
+4. In Settings, Pages, set the source to **GitHub Actions**. The
    `.github/workflows/pages.yml` workflow then publishes `docs/` on each push to
    `main`.
 

@@ -173,6 +173,9 @@ pre code { background: none; padding: 0; }
   max-width: 56ch;
 }
 
+.badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 0; }
+.badges img { display: block; height: 20px; }
+
 .hero-figure {
   border: 1px solid var(--line);
   border-radius: 8px;
